@@ -25,3 +25,25 @@ def test_pipelines_agree_with_c(name):
 def test_compound_after_comment_and_division_still_lex():
     src = "int main() { int a = 8; // c\n a /= 2; return a / 2; }"
     assert jit_run(merged_pipeline(src).ir_text) == 2
+
+
+MERGE_CASES = {
+    # constant assigned in one branch must not leak past the merge point
+    "if_branch_constant_does_not_leak": (
+        "int f(int n) { int p = 1; if (n % 2 == 0) { p = 0; } return p + 10; } "
+        "int main() { return f(4) * 100 + f(3); }", 1011),
+    "loop_body_constant_does_not_leak": (
+        "int main() { int c = 0; int p = 1; for (int i = 0; i < 3; i++) { p = 0; } "
+        "return c + p; }", 0),
+    "prime_counting_pattern": (
+        "int main() { int count = 0; for (int n = 2; n < 10; n++) { int prime = 1; "
+        "for (int d = 2; d * d <= n; d++) { if (n % d == 0) { prime = 0; } } "
+        "count += prime; } return count; }", 4),
+}
+
+
+@pytest.mark.parametrize("name", sorted(MERGE_CASES))
+def test_branch_and_loop_constants_do_not_leak(name):
+    src, expected = MERGE_CASES[name]
+    assert jit_run(conventional_pipeline(src).ir_text) == expected
+    assert jit_run(merged_pipeline(src).ir_text) == expected

@@ -272,6 +272,11 @@ class UnifiedSemanticVisitor:
             if not self.builder.block.is_terminated:
                 self.builder.branch(merge_bb)
         self.builder.position_at_end(merge_bb)
+        # Assignments inside a branch recorded constant facts while it was
+        # lowered; at the merge either value may flow in, so drop them.
+        self._invalidate_assigned(node.then_branch)
+        if node.else_branch is not None:
+            self._invalidate_assigned(node.else_branch)
 
     def _stmt_WhileStmt(self, node: WhileStmt) -> None:
         # The body may run any number of times (including zero): invalidate
@@ -293,6 +298,7 @@ class UnifiedSemanticVisitor:
             self._lower_statement(node.body)
             if not self.builder.block.is_terminated:
                 self.builder.branch(loop_bb)
+            self._invalidate_assigned(node.body)
             return
 
         cond_bb = self.builder.append_basic_block("whilecond")
@@ -309,6 +315,7 @@ class UnifiedSemanticVisitor:
             self.builder.branch(cond_bb)
 
         self.builder.position_at_end(after_bb)
+        self._invalidate_assigned(node.body)   # facts set inside the body are stale here
 
     # ------------------------------------------------------------------
     # Expression lowering
