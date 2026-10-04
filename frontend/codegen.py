@@ -228,7 +228,10 @@ class CodeGenVisitor:
         if node.op in CMP_PREDICATES:
             pred = CMP_PREDICATES[node.op]
             if isinstance(left.type, ir.FloatType) or isinstance(right.type, ir.FloatType):
-                cmp = self.builder.fcmp_unordered(pred, left, right, 'cmptmp')
+                # C: every relation with NaN is false except '!=' (true)
+                emit = (self.builder.fcmp_unordered if pred == '!='
+                        else self.builder.fcmp_ordered)
+                cmp = emit(pred, left, right, 'cmptmp')
             else:
                 cmp = self.builder.icmp_signed(pred, left, right, 'cmptmp')
             return self.builder.zext(cmp, self.i32, 'zexttmp')
@@ -258,7 +261,7 @@ class CodeGenVisitor:
     def _condition_to_bool_neg(self, val):
         """!x -> (x == 0)"""
         if isinstance(val.type, ir.FloatType):
-            return self.builder.fcmp_unordered('==', val, ir.Constant(self.f32, 0.0), 'nottmp')
+            return self.builder.fcmp_ordered('==', val, ir.Constant(self.f32, 0.0), 'nottmp')
         return self.builder.icmp_signed('==', val, ir.Constant(self.i32, 0), 'nottmp')
 
     def visit_Number(self, node):
