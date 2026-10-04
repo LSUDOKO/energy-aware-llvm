@@ -174,3 +174,28 @@ def test_invalid_config_rejected():
         HarnessConfig(n_trials=1).validated()
     with pytest.raises(ValueError):
         HarnessConfig(batch_repeats=0).validated()
+
+
+def test_baseline_is_first_configured_not_alphabetical():
+    """'zeta' is listed first so it is the baseline even though 'alpha' sorts first."""
+    fake = FakeCounter()
+    reader = ConfigNames(fake)
+    harness = EnergyHarness(reader, HarnessConfig(n_trials=4, warmup_runs=0, idle_sample_seconds=0.01))
+    from energy.harness import IdleProfile
+    harness.measure_idle_power = lambda: IdleProfile(power_w=1.0, sample_count=2, duration_s=0.01)
+
+    def slow():
+        time.sleep(0.010)
+        fake.burn(0.010, "zeta")
+
+    def fast():
+        time.sleep(0.004)
+        fake.burn(0.004, "alpha")
+
+    fake.watts["zeta"] = 8.0
+    fake.watts["alpha"] = 8.0
+    results = harness.run_experiment({"zeta": slow, "alpha": fast})
+    summaries = harness.summarize(results)
+    assert summaries["energy"] is not None
+    assert list(summaries["savings"]) == ["alpha"]
+    assert summaries["savings"]["alpha"]["time_savings_pct"] > 0

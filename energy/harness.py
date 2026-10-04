@@ -83,6 +83,7 @@ class EnergyHarness:
     def __init__(self, reader: RAPLReader, config: HarnessConfig | None = None):
         self.reader = reader
         self.config = (config or HarnessConfig()).validated()
+        self._config_order: list[str] = []
 
     # ------------------------------------------------------------------ #
     # Step 3: idle power
@@ -139,6 +140,7 @@ class EnergyHarness:
         """
         cfg = self.config
         names = list(configs.keys())
+        self._config_order = list(names)
         if len(names) == 0:
             raise ValueError("no configurations given")
 
@@ -215,7 +217,9 @@ class EnergyHarness:
         """
         from energy.stats import summarize, relative_savings
 
-        names = sorted({r.config for r in results})
+        # first-seen order: the first *configured* config is the baseline
+        names = list(dict.fromkeys(r.config for r in sorted(results, key=lambda r: r.trial_index)))
+        names = [n for n in self._config_order if n in names] or names
         by_config_time: dict[str, list[float]] = {n: [] for n in names}
         by_config_energy: dict[str, list[float]] = {n: [] for n in names}
 
