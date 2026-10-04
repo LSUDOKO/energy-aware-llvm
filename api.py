@@ -16,7 +16,7 @@ import traceback
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 
-from compile_pipeline import compile_source
+from compile_pipeline import DEFAULT_RUNS, MODES, compile_source
 
 app = Flask(__name__)
 CORS(app)
@@ -27,10 +27,19 @@ def compile_code():
     data = request.json or {}
     source_code = data.get('source_code', '')
     mode = data.get('mode', '-Mbalanced')  # -Meco, -Mbalanced, -Mperf
+    try:
+        n_runs = int(data.get('n_runs', DEFAULT_RUNS))
+    except (TypeError, ValueError):
+        return jsonify({'success': False, 'error': 'n_runs must be an integer'}), 400
+    if mode not in MODES:
+        return jsonify({'success': False,
+                        'error': f'unknown mode {mode!r}; expected one of {list(MODES)}'}), 400
+    if not source_code.strip():
+        return jsonify({'success': False, 'error': 'source_code is empty'}), 400
 
     try:
         result = compile_source(source_code, mode=mode, emit_object=True,
-                                name='a')
+                                name='a', n_runs=n_runs)
         payload = {
             'success': result['success'],
             'ast_time_ms': result.get('ast_time_ms', 0.0),
@@ -47,6 +56,8 @@ def compile_code():
             'instructions': result.get('instructions', {}),
             'passes_time_ms': result.get('passes_time_ms', 0.0),
             'runtime_us': result.get('runtime_us'),
+            'baseline_runtime_us': result.get('baseline_runtime_us'),
+            'ga': result.get('ga'),
             'return_value': result.get('return_value'),
             'differential_ok': result.get('differential_ok'),
             'object_file': result.get('object_file'),
