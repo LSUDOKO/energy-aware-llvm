@@ -15,7 +15,7 @@ import argparse
 import sys
 import time
 
-from compile_pipeline import compile_source, MODES
+from compile_pipeline import DEFAULT_RUNS, MODES, compile_source
 
 
 def log_stage(msg):
@@ -34,6 +34,9 @@ def main():
                         help='GA population size for -Mperf (default 16)')
     parser.add_argument('--no-object', action='store_true',
                         help='skip writing the object file')
+    parser.add_argument('--runs', type=int, default=DEFAULT_RUNS,
+                        help='assumed executions of the compiled program for '
+                             f'the lifecycle EDP (default {DEFAULT_RUNS})')
     args = parser.parse_args()
 
     mode = '-Meco' if args.Meco else '-Mperf' if args.Mperf else '-Mbalanced'
@@ -49,6 +52,7 @@ def main():
     result = compile_source(
         source_code, mode=mode, emit_object=not args.no_object, name=name,
         ga_kwargs=ga_kwargs if mode == '-Mperf' else None,
+        n_runs=args.runs,
     )
 
     # replay the stage log the API/web UI also shows
@@ -81,14 +85,25 @@ def main():
           f"{result['passes_time_ms']:.2f} ms pass pipeline")
     if result.get('runtime_us') is not None:
         print(f"  native runtime:  {result['runtime_us']:.1f} us "
-              f"(main returned {result['return_value']})")
+              f"(baseline {result['baseline_runtime_us']:.1f} us; "
+              f"main returned {result['return_value']})")
     if result.get('object_file'):
         print(f"  object file:     {result['object_file']} "
               f"({result['object_bytes']} bytes)")
     print(f"  E_compile:       {energy['e_compile_j'] * 1e3:.4f} mJ "
-          f"({energy['e_compile_note']})")
-    print(f"  EDP:             {energy['edp']:.4e} "
-          f"({energy['edp_savings_pct']:+.1f}% vs no-pass baseline)")
+          f"(baseline {energy['e_compile_baseline_j'] * 1e3:.4f} mJ; "
+          f"{energy['e_compile_note']})")
+    if energy.get('e_run_j') is not None:
+        print(f"  E_run:           {energy['e_run_j'] * 1e6:.3f} uJ/run "
+              f"(baseline {energy['e_run_baseline_j'] * 1e6:.3f}; "
+              f"{energy['e_run_note']})")
+        print(f"  EDP @ {energy['n_runs']:,} runs: {energy['edp']:.4e} "
+              f"({energy['edp_savings_pct']:+.1f}% vs no-pass baseline)")
+        be = energy['break_even_runs']
+        print("  break-even:      " + (
+            "optimization never repays its compile energy" if be is None
+            else "no extra compile energy over baseline" if be == 0
+            else f"{be:,.0f} runs repay the extra compile energy"))
     print(f"  differential:    optimized == unoptimized: "
           f"{result['differential_ok']}")
     print(f"\nTotal wall time: {(time.time() - t_start) * 1000:.0f} ms")
