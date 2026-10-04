@@ -5,8 +5,12 @@ Training data now comes from **real measurements** produced by
 benchmark x candidate pass sequence it records real Stage-2 features, real
 pass-scheduler wall time, real JIT-measured program runtime, and RAPL
 compile energy when available (otherwise the documented P-hat x T-hat
-software estimate).  The label is EDP savings relative to the
-no-optional-pass baseline of the same benchmark.
+software estimate).  The label is *lifecycle* EDP savings relative to the
+no-optional-pass baseline of the same benchmark: the program is compiled
+once and executed ``BALANCED_RUNS`` times (``energy/lifecycle.py``), so a
+pass sequence is only worth running when its compile cost is repaid by
+cheaper executions.  Labels are recomputed from the measured compile and
+run times (``relabel_savings``), so one dataset can serve any run count.
 
 If no measured dataset exists yet, ``train_model()`` falls back to a
 clearly-marked *model-labelled* set built by actually running every
@@ -30,6 +34,8 @@ import pandas as pd
 from xgboost import XGBRegressor
 
 from backend.passes import AVAILABLE_PASSES, expand_sequence
+from energy.lifecycle import Cost, edp_savings_pct
+from stage2.pass_gating import DEFAULT_POWER_W
 
 MODEL_PATH = Path(__file__).resolve().parent / "xgboost_pass_model.pkl"
 DATASET_PATH = Path(__file__).resolve().parent / "datasets" / "measurements.csv"
@@ -66,6 +72,7 @@ CANDIDATE_SEQUENCES: list[list[str]] = [
 ]
 
 TARGET_COL = "edp_savings"
+BALANCED_RUNS = 10_000   # executions assumed by the -Mbalanced objective
 
 
 def sequence_key(seq) -> str:
@@ -80,6 +87,42 @@ def row_from(features: dict, sequence) -> dict:
     for p in AVAILABLE_PASSES:
         row[f"pass{p}"] = 1 if p in expanded else 0
     return row
+
+
+def relabel_savings(frame: pd.DataFrame, n_runs: int = BALANCED_RUNS,
+                    power_w: float = DEFAULT_POWER_W) -> pd.DataFrame:
+    """Recompute ``TARGET_COL`` as lifecycle-EDP savings (fraction, not %).
+
+    Per benchmark, every row is compared with that benchmark's ``(none)``
+    row:  ``Cost(P x (T_shared + T_passes), ., P x T_run, T_run)`` with
+    ``T_shared`` the front-end + code-generation time paid by every build.
+    Rows without a measured runtime are dropped; frames lacking the timing
+    columns (e.g. hand-built test frames) are returned unchanged.
+    """
+    needed = {"benchmark", "sequence", "t_compile_s", "runtime_s_median"}
+    if not needed <= set(frame.columns):
+        return frame
+    out = frame.copy()
+    out["runtime_s_median"] = pd.to_numeric(out["runtime_s_median"], errors="coerce")
+    out = out[out["runtime_s_median"] > 0].copy()
+    shared = (pd.to_numeric(out["t_shared_s"], errors="coerce").fillna(0.0)
+              if "t_shared_s" in out.columns else 0.0)
+    out["_t_c"] = out["t_compile_s"].astype(float) + shared
+    labels = {}
+    for bench, grp in out.groupby("benchmark"):
+        base_rows = grp[grp["sequence"] == "(none)"]
+        if base_rows.empty:
+            continue
+        b = base_rows.iloc[0]
+        base = Cost(power_w * b["_t_c"], b["_t_c"],
+                    power_w * b["runtime_s_median"], b["runtime_s_median"])
+        for idx, r in grp.iterrows():
+            cost = Cost(power_w * r["_t_c"], r["_t_c"],
+                        power_w * r["runtime_s_median"], r["runtime_s_median"])
+            labels[idx] = edp_savings_pct(base, cost, n_runs) / 100.0
+    out = out[out.index.isin(labels)].copy()
+    out[TARGET_COL] = pd.Series(labels)
+    return out.drop(columns=["_t_c"])
 
 
 def load_dataset(path=None) -> pd.DataFrame | None:
@@ -113,14 +156,16 @@ def _demo_sources() -> list[tuple[str, str]]:
 
 
 def _generate_model_labels() -> pd.DataFrame:
-    """Fallback: run every candidate sequence for real on demo sources and
-    label with static-cost-model EDP savings (timings are measured)."""
+    """Fallback when no measured CSV exists: run every candidate sequence
+    for real on the bundled demo sources (real pass wall time, real native
+    runtime) and label with lifecycle-EDP savings (``relabel_savings``)."""
     import time
 
-    from energy.execution import jit_run
+    from energy.execution import measure_runtime, object_bytes
     from stage2.extractor import IRFeatureExtractor, static_cost
-    from stage2.pass_gating import DEFAULT_POWER_W, load_profiles
+    from stage2.pass_gating import load_profiles
 
+    from backend.passes import apply_pass_sequence
     from energy.experiments import merged_pipeline
 
     profiles = load_profiles()
@@ -128,52 +173,40 @@ def _generate_model_labels() -> pd.DataFrame:
     rows = []
     for name, src in _demo_sources():
         try:
+            t0 = time.perf_counter()
             ir_text = str(merged_pipeline(src).ir_text)
+            t_frontend = time.perf_counter() - t0
             features = IRFeatureExtractor(ir_text).extract_features()
+            t0 = time.perf_counter()
+            object_bytes(ir_text)
+            t_shared = t_frontend + (time.perf_counter() - t0)
         except Exception:
             continue
 
-        baseline = None
         for seq in CANDIDATE_SEQUENCES:
-            t0 = time.perf_counter()
             try:
-                from backend.passes import apply_pass_sequence
+                t0 = time.perf_counter()
                 result = apply_pass_sequence(ir_text, seq)
                 t_compile = time.perf_counter() - t0
-                opt = result.ir_text
             except Exception:
                 continue
-            cost = static_cost(opt)
+            if not result.verified:
+                continue
             try:
-                t_run = 0.0
-                for _ in range(3):
-                    ta = time.perf_counter()
-                    jit_run(opt)
-                    t_run += time.perf_counter() - ta
-                t_run /= 3.0
+                t_run, _value = measure_runtime(result.ir_text, samples=3)
             except RuntimeError:
-                t_run = cost * 1e-6  # static fallback when JIT not possible
-            edp = (power * t_compile) * max(t_run, 1e-9)
-            if not seq:
-                baseline = edp
+                continue
             row = row_from(features, seq)
-            row["benchmark"] = name
-            row["sequence"] = sequence_key(seq)
-            row["t_compile_s"] = t_compile
-            row["runtime_s_median"] = t_run
-            row["edp_proxy"] = edp
-            row["energy_source"] = "estimated"
-            rows.append((row, edp))
-        # fill savings now that the baseline of this benchmark is known
-        recent = rows[-len(CANDIDATE_SEQUENCES):]
-        if baseline:
-            for row, edp in recent:
-                row[TARGET_COL] = (baseline - edp) / baseline
-        else:
-            for row, _edp in recent:
-                row[TARGET_COL] = 0.0
-    frame = pd.DataFrame([r for r, _ in rows])
-    return frame
+            row.update({
+                "benchmark": name, "sequence": sequence_key(seq),
+                "t_compile_s": t_compile, "t_shared_s": t_shared,
+                "runtime_s_median": t_run,
+                "static_cost_after": static_cost(result.ir_text),
+                "energy_source": "estimated",
+            })
+            rows.append(row)
+    frame = pd.DataFrame(rows)
+    return relabel_savings(frame, power_w=power) if len(frame) else frame
 
 
 def train_model(frame: pd.DataFrame | None = None) -> XGBRegressor:
@@ -188,6 +221,7 @@ def train_model(frame: pd.DataFrame | None = None) -> XGBRegressor:
     for c in feature_cols:
         if c not in frame.columns:
             frame[c] = 0
+    frame = relabel_savings(frame)
     X = frame[feature_cols].astype(float)
     y = frame[TARGET_COL].astype(float)
 
