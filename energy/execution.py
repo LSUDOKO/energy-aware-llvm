@@ -77,6 +77,32 @@ def emit_object(ir_text: str, output_path: str | Path) -> Path:
     return out
 
 
+class JitProgram:
+    """A JIT-compiled module kept alive so ``main`` can be called repeatedly.
+
+    Compiling once and calling many times is what separates the *program's*
+    runtime (E_run input) from JIT set-up cost.  The engine and module are
+    owned by this object, so the function pointer stays valid for as long as
+    the object lives.
+    """
+
+    def __init__(self, ir_text: str, entry: str = "main"):
+        self._mod = _parse_and_verify(ir_text)
+        target = llvm.Target.from_default_triple()
+        self._tm = target.create_target_machine()
+        self._engine = llvm.create_mcjit_compiler(llvm.parse_assembly(""),
+                                                  self._tm)
+        self._engine.add_module(self._mod)
+        self._engine.finalize_object()
+        addr = self._engine.get_function_address(entry)
+        if addr == 0:
+            raise RuntimeError(f"entry '{entry}' not found in module")
+        self._cfunc = ctypes.CFUNCTYPE(ctypes.c_int)(addr)
+
+    def call(self) -> int:
+        return self._cfunc()
+
+
 def measure_runtime(ir_text: str, entry: str = "main",
                     samples: int = 7, min_batch_s: float = 0.002
                     ) -> tuple[float, int]:
@@ -87,17 +113,8 @@ def measure_runtime(ir_text: str, entry: str = "main",
     (E_run input), not JIT setup time.  Inner batch size is auto-tuned so
     every sample spans at least ``min_batch_s``.
     """
-    mod = _parse_and_verify(ir_text)
-    target = llvm.Target.from_default_triple()
-    tm = target.create_target_machine()
-    backing = llvm.parse_assembly("")
-    engine = llvm.create_mcjit_compiler(backing, tm)
-    engine.add_module(mod)
-    engine.finalize_object()
-    addr = engine.get_function_address(entry)
-    if addr == 0:
-        raise RuntimeError(f"entry '{entry}' not found in module")
-    cfunc = ctypes.CFUNCTYPE(ctypes.c_int)(addr)
+    prog = JitProgram(ir_text, entry)
+    cfunc = prog.call
 
     value = cfunc()                       # warm-up (also picks the result)
     t0 = time.perf_counter()
@@ -112,8 +129,6 @@ def measure_runtime(ir_text: str, entry: str = "main",
         for _ in range(inner):
             value = cfunc()
         times.append((time.perf_counter() - t0) / inner)
-    # keep engine/mod alive until after the timed calls complete
-    del engine
     times.sort()
     return times[len(times) // 2], value
 
