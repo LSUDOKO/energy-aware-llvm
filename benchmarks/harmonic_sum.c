@@ -4,5 +4,6 @@ int main() {
     for (int k = 1; k <= 400000; k++) {
         s += 1.0 / k;
     }
-    return s * 1000.0;
+    int scaled = s * 1000.0;   // explicit float->int narrowing
+    return scaled;
 }
