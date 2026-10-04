@@ -66,14 +66,22 @@ def jit_run(ir_text: str, entry: str = "main") -> int:
     return result
 
 
-def emit_object(ir_text: str, output_path: str | Path) -> Path:
-    """Emit a host-object file from LLVM IR text. Returns the written path."""
+def object_bytes(ir_text: str) -> bytes:
+    """Machine-code generation: LLVM IR text -> relocatable object bytes.
+
+    Kept free of file I/O so the compile pipeline can meter the backend
+    (instruction selection, register allocation, emission) on its own.
+    """
     mod = _parse_and_verify(ir_text)
     target = llvm.Target.from_default_triple()
     tm = target.create_target_machine()
-    obj_bytes = tm.emit_object(mod)
+    return tm.emit_object(mod)
+
+
+def emit_object(ir_text: str, output_path: str | Path) -> Path:
+    """Emit a host-object file from LLVM IR text. Returns the written path."""
     out = Path(output_path)
-    out.write_bytes(obj_bytes)
+    out.write_bytes(object_bytes(ir_text))
     return out
 
 
