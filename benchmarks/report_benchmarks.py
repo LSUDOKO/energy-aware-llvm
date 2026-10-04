@@ -76,9 +76,9 @@ def grouped_bars(ax, kernels, configs, value_fn, log=False):
 def chart_runtime(results, out):
     ks = results["kernels"]
     fig, ax = plt.subplots(figsize=(10, 4.6))
-    grouped_bars(ax, ks, ALL, lambda b: b["speedup_vs_unopt"])
+    grouped_bars(ax, ks, ALL, lambda b: b["speedup_vs_unopt"], log=True)
     ax.axhline(1.0, color="#444", lw=1, ls="--")
-    ax.set_ylabel("native speedup vs unoptimized build (x)")
+    ax.set_ylabel("native speedup vs unoptimized build (x, log)")
     ax.set_title("Generated-code speed: measured native runtime of each object file")
     gm = {c: geomean([build_of(k, c)["speedup_vs_unopt"] for k in ks]) for c in ALL}
     ax.legend(ncol=5, loc="upper center", bbox_to_anchor=(0.5, -0.3),
