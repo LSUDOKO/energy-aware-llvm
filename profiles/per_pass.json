@@ -5,122 +5,122 @@
     "power_w": 25.0,
     "run_j_per_unit": 1e-06,
     "run_s_per_unit": 1e-06,
-    "updated": "2026-10-04T15:37:14"
+    "updated": "2026-10-04T17:27:18"
   },
   "passes": {
     "-adce": {
-      "energy_j": 0.0014548750186804682,
-      "n_samples": 3,
+      "energy_j": 0.0016265499652945437,
+      "n_samples": 55,
       "source": "collect_dataset",
-      "t_seconds": 5.819500074721873e-05
+      "t_seconds": 6.506199861178175e-05
     },
     "-aggressive-instcombine": {
-      "energy_j": 0.0054999250096443575,
-      "n_samples": 1,
+      "energy_j": 0.007254487536556553,
+      "n_samples": 22,
       "source": "collect_dataset",
-      "t_seconds": 0.0002199970003857743
+      "t_seconds": 0.0002901795014622621
     },
     "-constmerge": {
-      "energy_j": 0.0020925250282743946,
-      "n_samples": 1,
+      "energy_j": 0.0009529375347483438,
+      "n_samples": 22,
       "source": "collect_dataset",
-      "t_seconds": 8.370100113097578e-05
+      "t_seconds": 3.811750138993375e-05
     },
     "-dce": {
-      "energy_j": 0.0011768750482588075,
-      "n_samples": 3,
+      "energy_j": 0.0011388125130906701,
+      "n_samples": 66,
       "source": "collect_dataset",
-      "t_seconds": 4.70750019303523e-05
+      "t_seconds": 4.5552500523626804e-05
     },
     "-dse": {
-      "energy_j": 0.008119899985103984,
-      "n_samples": 4,
+      "energy_j": 0.008030312528717332,
+      "n_samples": 66,
       "source": "collect_dataset",
-      "t_seconds": 0.0003247959994041594
+      "t_seconds": 0.00032121250114869326
     },
     "-globalopt": {
-      "energy_j": 0.0014468500012299046,
-      "n_samples": 1,
+      "energy_j": 0.001430174961569719,
+      "n_samples": 11,
       "source": "collect_dataset",
-      "t_seconds": 5.7874000049196184e-05
+      "t_seconds": 5.720699846278876e-05
     },
     "-gvn": {
-      "energy_j": 0.009542225006953231,
-      "n_samples": 4,
+      "energy_j": 0.011371875007171184,
+      "n_samples": 55,
       "source": "collect_dataset",
-      "t_seconds": 0.00038168900027812924
+      "t_seconds": 0.00045487500028684735
     },
     "-instcombine": {
-      "energy_j": 0.008930125022743596,
-      "n_samples": 3,
+      "energy_j": 0.012054499893565662,
+      "n_samples": 33,
       "source": "collect_dataset",
-      "t_seconds": 0.00035720500090974383
+      "t_seconds": 0.0004821799957426265
     },
     "-ipsccp": {
-      "energy_j": 0.007275362486325321,
-      "n_samples": 2,
+      "energy_j": 0.0070919124482315965,
+      "n_samples": 22,
       "source": "collect_dataset",
-      "t_seconds": 0.00029101449945301283
+      "t_seconds": 0.00028367649792926386
     },
     "-lcsr": {
-      "energy_j": 0.01096855003197561,
-      "n_samples": 3,
+      "energy_j": 0.010602549991745036,
+      "n_samples": 55,
       "source": "collect_dataset",
-      "t_seconds": 0.0004387420012790244
+      "t_seconds": 0.00042410199966980144
     },
     "-lcssa": {
-      "energy_j": 0.001343300027656369,
-      "n_samples": 2,
+      "energy_j": 0.0014429249858949333,
+      "n_samples": 44,
       "source": "collect_dataset",
-      "t_seconds": 5.3732001106254756e-05
+      "t_seconds": 5.7716999435797334e-05
     },
     "-loop-rotate": {
-      "energy_j": 0.010292324986949097,
-      "n_samples": 3,
+      "energy_j": 0.010104775174113456,
+      "n_samples": 55,
       "source": "collect_dataset",
-      "t_seconds": 0.0004116929994779639
+      "t_seconds": 0.00040419100696453825
     },
     "-loop-unroll": {
-      "energy_j": 0.00936503752200224,
-      "n_samples": 2,
+      "energy_j": 0.00937993745537824,
+      "n_samples": 66,
       "source": "collect_dataset",
-      "t_seconds": 0.0003746015008800896
+      "t_seconds": 0.0003751974982151296
     },
     "-reassociate": {
-      "energy_j": 0.001908925059979083,
-      "n_samples": 3,
+      "energy_j": 0.001916524979606038,
+      "n_samples": 44,
       "source": "collect_dataset",
-      "t_seconds": 7.635700239916332e-05
+      "t_seconds": 7.666099918424152e-05
     },
     "-sccp": {
-      "energy_j": 0.0075388499681139365,
-      "n_samples": 5,
+      "energy_j": 0.007958675087138545,
+      "n_samples": 77,
       "source": "collect_dataset",
-      "t_seconds": 0.00030155399872455746
+      "t_seconds": 0.0003183470034855418
     },
     "-simplifycfg": {
-      "energy_j": 0.006965825014049187,
-      "n_samples": 6,
+      "energy_j": 0.007932124935905449,
+      "n_samples": 121,
       "source": "collect_dataset",
-      "t_seconds": 0.0002786330005619675
+      "t_seconds": 0.00031728499743621796
     },
     "-sinking": {
-      "energy_j": 0.006002349982736632,
-      "n_samples": 1,
+      "energy_j": 0.006301425037236186,
+      "n_samples": 22,
       "source": "collect_dataset",
-      "t_seconds": 0.0002400939993094653
+      "t_seconds": 0.00025205700148944743
     },
     "-sroa": {
-      "energy_j": 0.009976999990612967,
-      "n_samples": 5,
+      "energy_j": 0.009516087538941065,
+      "n_samples": 66,
       "source": "collect_dataset",
-      "t_seconds": 0.0003990799996245187
+      "t_seconds": 0.0003806435015576426
     },
     "-tailcallelim": {
-      "energy_j": 0.006459399992309045,
-      "n_samples": 2,
+      "energy_j": 0.005788387534266803,
+      "n_samples": 22,
       "source": "collect_dataset",
-      "t_seconds": 0.0002583759996923618
+      "t_seconds": 0.00023153550137067214
     }
   }
 }

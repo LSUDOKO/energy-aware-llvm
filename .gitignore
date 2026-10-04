@@ -11,7 +11,7 @@ __pycache__/
 # Trained model artifacts and datasets
 *.pkl
 *.model
-datasets/*.csv
+# the measured dataset is a deliverable (labeled dataset); keep it tracked
 datasets/*.parquet
 
 # Experiment and report outputs (keep .gitkeep-tracked dirs)
