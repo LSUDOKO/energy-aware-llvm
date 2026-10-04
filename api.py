@@ -1,105 +1,73 @@
+"""Flask API for the web editor.
+
+Delegates to ``compile_pipeline.compile_source`` — the same real Stages 1-3
+implementation used by the CLI driver — so the browser gets measured
+numbers (front-end time, pass time, native runtime, object size, EDP) and
+the full 52-metric feature dump instead of the old simulated backend logs.
+
+Response schema is backward compatible (success, ast_time_ms, ml_time_ms,
+predicted_edp, features, selected_passes, logs, llvm_ir) plus the new
+evidence fields (optimized_ir, gating, energy, instructions, runtime_us,
+object_file, differential_ok).
+"""
 import time
+import traceback
+
 from flask import Flask, request, jsonify
 from flask_cors import CORS
-from frontend.lexer import Lexer
-from frontend.parser import Parser
-from frontend.codegen import CodeGenVisitor
-from stage2_extractor import IRFeatureExtractor
-from stage3_ml_model import get_model, rank_passes
-import traceback
+
+from compile_pipeline import compile_source
 
 app = Flask(__name__)
 CORS(app)
 
+
 @app.route('/compile', methods=['POST'])
 def compile_code():
-    data = request.json
+    data = request.json or {}
     source_code = data.get('source_code', '')
-    mode = data.get('mode', '-Mbalanced') # -Meco, -Mbalanced, -Mperf
-
-    logs = []
-    
-    def log_stage(msg):
-        logs.append(f"[{time.strftime('%H:%M:%S')}] {msg}")
+    mode = data.get('mode', '-Mbalanced')  # -Meco, -Mbalanced, -Mperf
 
     try:
-        # STAGE 1
-        log_stage("STAGE 1: Fused Single-Pass Front-End (Minimizing E_compile)")
-        t0 = time.time()
-        lexer = Lexer(source_code)
-        parser_obj = Parser(lexer.tokens)
-        ast = parser_obj.parse()
-        
-        codegen = CodeGenVisitor()
-        llvm_module = codegen.generate_code(ast)
-        t1 = time.time()
-        
-        ast_time = (t1-t0)*1000
-        logs.append(f"-> AST Parsed and LLVM IR emitted in {ast_time:.2f} ms.")
-
-        # STAGE 2
-        log_stage("STAGE 2: Static IR Feature Extraction & Pass Gating")
-        extractor = IRFeatureExtractor(llvm_module)
-        features = extractor.extract_features()
-        
-        logs.append("-> Extracted 35+ IR Metrics:")
-        for k, v in features.items():
-            logs.append(f"   {k}: {v}")
-
-        # STAGE 3
-        log_stage(f"STAGE 3: Multi-Mode Pass Scheduling & Backend ({mode})")
-        selected_passes = []
-        pred_edp = 0.0
-        ml_time = 0.0
-        
-        if mode == '-Meco':
-            logs.append("-> Mode: -Meco (Minimal Compile Overhead)")
-            selected_passes = ['-O0']
-            logs.append("-> Skipping optional passes to minimize E_compile.")
-            
-        elif mode == '-Mperf':
-            logs.append("-> Mode: -Mperf (Genetic Algorithm Search Loop)")
-            logs.append("-> Running GA to optimize 1/EDP... (Mocking search)")
-            time.sleep(1.5) # Simulate GA search time
-            selected_passes = ['-mem2reg', '-simplifycfg', '-loop-unroll', '-O3']
-            logs.append("-> GA Selected Top Sequence.")
-            
-        else: # Default to -Mbalanced
-            logs.append("-> Mode: -Mbalanced (ML Pass Ranker)")
-            model = get_model() # Loads or trains XGBoost model
-            t_start_ml = time.time()
-            selected_passes, pred_edp = rank_passes(features, model)
-            t_end_ml = time.time()
-            ml_time = (t_end_ml-t_start_ml)*1000
-            logs.append(f"-> ML Pass Ranker completed in {ml_time:.2f} ms.")
-            logs.append(f"-> Predicted EDP Benefit: {pred_edp:.2f}")
-
-        logs.append(f"-> Final Gated Pass Sequence: {', '.join(selected_passes)}")
-        
-        # Fake backend codegen step
-        logs.append("\n-> Passing to LLVM Backend Code Gen...")
-        logs.append("-> Object file generated: a.out (simulated)")
-        log_stage("COMPILATION SUCCESSFUL")
-
-        return jsonify({
-            'success': True,
-            'ast_time_ms': ast_time,
-            'ml_time_ms': ml_time,
-            'predicted_edp': pred_edp,
-            'features': features,
-            'selected_passes': selected_passes,
-            'logs': logs,
-            'llvm_ir': str(llvm_module)
-        })
+        result = compile_source(source_code, mode=mode, emit_object=True,
+                                name='a')
+        payload = {
+            'success': result['success'],
+            'ast_time_ms': result.get('ast_time_ms', 0.0),
+            'ml_time_ms': result.get('ml_time_ms', 0.0),
+            'predicted_edp': result.get('predicted_edp', 0.0),
+            'features': result.get('features', {}),
+            'selected_passes': result.get('selected_passes', []),
+            'logs': result.get('logs', []),
+            'llvm_ir': result.get('llvm_ir', ''),
+            # --- measured evidence (new) ---
+            'mode': mode,
+            'gating': result.get('gating', {}),
+            'optimized_ir': result.get('optimized_ir', ''),
+            'instructions': result.get('instructions', {}),
+            'passes_time_ms': result.get('passes_time_ms', 0.0),
+            'runtime_us': result.get('runtime_us'),
+            'return_value': result.get('return_value'),
+            'differential_ok': result.get('differential_ok'),
+            'object_file': result.get('object_file'),
+            'object_bytes': result.get('object_bytes'),
+            'energy': result.get('energy', {}),
+        }
+        if not result['success']:
+            payload['error'] = result.get('error', 'verification failed')
+            return jsonify(payload), 422
+        return jsonify(payload)
 
     except Exception as e:
-        log_stage(f"ERROR: {str(e)}")
-        logs.append(traceback.format_exc())
-        return jsonify({
-            'success': False,
-            'logs': logs,
-            'error': str(e)
-        }), 500
+        logs = [f"[{time.strftime('%H:%M:%S')}] ERROR: {str(e)}",
+                traceback.format_exc()]
+        return jsonify({'success': False, 'logs': logs, 'error': str(e)}), 500
+
+
+@app.route('/health', methods=['GET'])
+def health():
+    return jsonify({'status': 'ok', 'time': time.time()})
+
 
 if __name__ == '__main__':
     app.run(debug=True, port=5000)

@@ -1,14 +1,26 @@
+"""Energy-Aware Compiler Optimization — command-line driver.
+
+Three scheduling modes, all real (no simulated backend, no sleeps):
+
+  -Meco       strict energy budget: gate skips optional passes whose
+              predicted benefit does not repay λ·Ê + µ·T̂
+  -Mbalanced  XGBoost pass ranker trained on measured data, then gated
+  -Mperf      genetic-algorithm search maximising 1/EDP, then gated
+
+Example::
+
+    ./venv/bin/python compiler_driver.py benchmarks/fib_iter.c -Mperf
+"""
 import argparse
 import sys
 import time
-from frontend.lexer import Lexer
-from frontend.parser import Parser
-from frontend.codegen import CodeGenVisitor
-from stage2_extractor import IRFeatureExtractor
-from stage3_ml_model import get_model, rank_passes
+
+from compile_pipeline import compile_source, MODES
+
 
 def log_stage(msg):
-    print(f"\n[{time.strftime('%H:%M:%S')}] {msg}")
+    print(f"\n[{time.strftime('%H:%M:%S')}]{msg}")
+
 
 def main():
     parser = argparse.ArgumentParser(description="Energy Aware Compiler Optimization")
@@ -16,75 +28,71 @@ def main():
     parser.add_argument('-Meco', action='store_true', help='Minimal Compile Overhead mode')
     parser.add_argument('-Mbalanced', action='store_true', help='ML Pass Ranker mode')
     parser.add_argument('-Mperf', action='store_true', help='Genetic Algorithm Search mode')
-    
+    parser.add_argument('--ga-generations', type=int, default=8,
+                        help='GA generations for -Mperf (default 8)')
+    parser.add_argument('--ga-population', type=int, default=16,
+                        help='GA population size for -Mperf (default 16)')
+    parser.add_argument('--no-object', action='store_true',
+                        help='skip writing the object file')
     args = parser.parse_args()
-    
+
+    mode = '-Meco' if args.Meco else '-Mperf' if args.Mperf else '-Mbalanced'
+
     with open(args.source_file, 'r') as f:
         source_code = f.read()
 
-    # ==========================================
-    # STAGE 1: FUSED SINGLE-PASS FRONT-END
-    # ==========================================
-    log_stage("STAGE 1: Fused Single-Pass Front-End (Minimizing E_compile)")
-    
-    t0 = time.time()
-    lexer = Lexer(source_code)
-    parser_obj = Parser(lexer.tokens)
-    ast = parser_obj.parse()
-    
-    codegen = CodeGenVisitor()
-    llvm_module = codegen.generate_code(ast)
-    t1 = time.time()
-    
-    print(f"-> AST Parsed and LLVM IR emitted in {((t1-t0)*1000):.2f} ms.")
+    name = args.source_file.rsplit('/', 1)[-1].rsplit('.', 1)[0]
+    ga_kwargs = {"generations": args.ga_generations,
+                 "pop_size": args.ga_population}
 
-    # ==========================================
-    # STAGE 2: STATIC IR FEATURE EXTRACTION
-    # ==========================================
-    log_stage("STAGE 2: Static IR Feature Extraction & Pass Gating")
-    
-    extractor = IRFeatureExtractor(llvm_module)
-    features = extractor.extract_features()
-    
-    print("-> Extracted 35+ IR Metrics:")
-    for k, v in features.items():
-        print(f"   {k}: {v}")
+    t_start = time.time()
+    result = compile_source(
+        source_code, mode=mode, emit_object=not args.no_object, name=name,
+        ga_kwargs=ga_kwargs if mode == '-Mperf' else None,
+    )
 
-    # ==========================================
-    # STAGE 3: MULTI-MODE PASS SCHEDULING
-    # ==========================================
-    log_stage("STAGE 3: Multi-Mode Pass Scheduling & Backend")
-    
-    selected_passes = []
-    
-    if args.Meco:
-        print("-> Mode: -Meco (Minimal Compile Overhead)")
-        selected_passes = ['-O0']
-        print("-> Skipping optional passes to minimize E_compile.")
-        
-    elif args.Mperf:
-        print("-> Mode: -Mperf (Genetic Algorithm Search Loop)")
-        print("-> Running GA to optimize 1/EDP... (Mocking search)")
-        time.sleep(1.5) # Simulate GA search time
-        selected_passes = ['-mem2reg', '-simplifycfg', '-loop-unroll', '-O3']
-        print("-> GA Selected Top Sequence.")
-        
-    else: # Default to -Mbalanced if nothing specified, or if -Mbalanced specified
-        print("-> Mode: -Mbalanced (ML Pass Ranker)")
-        model = get_model() # Loads or trains XGBoost model
-        t_start_ml = time.time()
-        selected_passes, pred_edp = rank_passes(features, model)
-        t_end_ml = time.time()
-        print(f"-> ML Pass Ranker completed in {((t_end_ml-t_start_ml)*1000):.2f} ms.")
-        print(f"-> Predicted EDP Benefit: {pred_edp:.2f}")
+    # replay the stage log the API/web UI also shows
+    for line in result.get('logs', []):
+        print(line)
 
-    print(f"-> Final Gated Pass Sequence: {', '.join(selected_passes)}")
-    
-    # Fake backend codegen step
-    print("\n-> Passing to LLVM Backend Code Gen...")
-    print("-> Object file generated: a.out (simulated)")
-    
-    log_stage("COMPILATION SUCCESSFUL")
-    
+    if not result.get('success'):
+        print(f"\nCOMPILATION FAILED: {result.get('error', 'verification failed')}",
+              file=sys.stderr)
+        sys.exit(1)
+
+    feats = result['features']
+    print("\n--- Stage 2 metrics (52) ---")
+    print(f"  instructions={feats['total_instructions']} "
+          f"blocks={feats['num_basic_blocks']} "
+          f"functions={feats['num_functions']} "
+          f"branches={feats['num_branches']} "
+          f"loops={feats['num_natural_loops']} "
+          f"max_loop_depth={feats['max_loop_depth']} "
+          f"cyclomatic={feats['cyclomatic_complexity']} "
+          f"static_cost={feats['static_cost']:.0f}")
+
+    energy = result['energy']
+    print("\n--- Results ---")
+    print(f"  mode:            {mode}")
+    print(f"  gated passes:    {', '.join(result['selected_passes']) or '(none)'}")
+    print(f"  IR instructions: {result['instructions']['before']} -> "
+          f"{result['instructions']['after']}")
+    print(f"  compile time:    {result['ast_time_ms']:.2f} ms front-end, "
+          f"{result['passes_time_ms']:.2f} ms pass pipeline")
+    if result.get('runtime_us') is not None:
+        print(f"  native runtime:  {result['runtime_us']:.1f} us "
+              f"(main returned {result['return_value']})")
+    if result.get('object_file'):
+        print(f"  object file:     {result['object_file']} "
+              f"({result['object_bytes']} bytes)")
+    print(f"  E_compile:       {energy['e_compile_j'] * 1e3:.4f} mJ "
+          f"({energy['e_compile_note']})")
+    print(f"  EDP:             {energy['edp']:.4e} "
+          f"({energy['edp_savings_pct']:+.1f}% vs no-pass baseline)")
+    print(f"  differential:    optimized == unoptimized: "
+          f"{result['differential_ok']}")
+    print(f"\nTotal wall time: {(time.time() - t_start) * 1000:.0f} ms")
+
+
 if __name__ == '__main__':
     main()

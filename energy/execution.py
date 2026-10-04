@@ -14,6 +14,7 @@ Requires llvmlite's native target initialization (done lazily here).
 from __future__ import annotations
 
 import ctypes
+import time
 from pathlib import Path
 
 from llvmlite import binding as llvm
@@ -74,6 +75,47 @@ def emit_object(ir_text: str, output_path: str | Path) -> Path:
     out = Path(output_path)
     out.write_bytes(obj_bytes)
     return out
+
+
+def measure_runtime(ir_text: str, entry: str = "main",
+                    samples: int = 7, min_batch_s: float = 0.002
+                    ) -> tuple[float, int]:
+    """Compile once, then time repeated calls of `entry`.
+
+    Returns ``(median_seconds_per_call, last_return_value)``.  Compiling is
+    done exactly once so the measured time is the *program's* runtime
+    (E_run input), not JIT setup time.  Inner batch size is auto-tuned so
+    every sample spans at least ``min_batch_s``.
+    """
+    mod = _parse_and_verify(ir_text)
+    target = llvm.Target.from_default_triple()
+    tm = target.create_target_machine()
+    backing = llvm.parse_assembly("")
+    engine = llvm.create_mcjit_compiler(backing, tm)
+    engine.add_module(mod)
+    engine.finalize_object()
+    addr = engine.get_function_address(entry)
+    if addr == 0:
+        raise RuntimeError(f"entry '{entry}' not found in module")
+    cfunc = ctypes.CFUNCTYPE(ctypes.c_int)(addr)
+
+    value = cfunc()                       # warm-up (also picks the result)
+    t0 = time.perf_counter()
+    value = cfunc()
+    dt = time.perf_counter() - t0
+    inner = max(1, int(min_batch_s / max(dt, 1e-9)))
+    inner = min(inner, 1_000_000)
+
+    times = []
+    for _ in range(samples):
+        t0 = time.perf_counter()
+        for _ in range(inner):
+            value = cfunc()
+        times.append((time.perf_counter() - t0) / inner)
+    # keep engine/mod alive until after the timed calls complete
+    del engine
+    times.sort()
+    return times[len(times) // 2], value
 
 
 def runs_match(ir_a: str, ir_b: str) -> bool:
