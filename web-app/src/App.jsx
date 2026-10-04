@@ -1,9 +1,19 @@
-import React, { useState } from 'react';
-import { Code2, Zap, Play, Settings2, Activity, CheckCircle2, Box, Cpu } from 'lucide-react';
-import './App.css';
+import { useEffect, useState } from 'react'
+import { compile, getBenchmark, listBenchmarks } from './api'
+import BenchmarkView from './components/BenchmarkView'
+import GateTable from './components/GateTable'
+import IRView from './components/IRView'
+import Ledger from './components/Ledger'
+import { ms } from './lib/format'
+import './App.css'
 
-function App() {
-  const [code, setCode] = useState(`int main() {
+const MODES = [
+  { id: '-Meco', name: 'Eco', note: 'strictest budget: only passes that repay their cost' },
+  { id: '-Mbalanced', name: 'Balanced', note: 'XGBoost ranker trained on measured runs' },
+  { id: '-Mperf', name: 'Performance', note: 'genetic search, scored by measured EDP' },
+]
+const TABS = ['Ledger', 'Gate', 'IR', 'Log', 'Benchmarks']
+const STARTER = `int main() {
     int a = 10;
     int b = 20;
     int c = a + b;
@@ -13,180 +23,123 @@ function App() {
     } else {
         return 0;
     }
-}`);
-  
-  const [mode, setMode] = useState('-Mbalanced');
-  const [isCompiling, setIsCompiling] = useState(false);
-  const [results, setResults] = useState(null);
+}`
 
-  const handleCompile = async () => {
-    setIsCompiling(true);
+export default function App() {
+  const [code, setCode] = useState(STARTER)
+  const [mode, setMode] = useState('-Mbalanced')
+  const [runs, setRuns] = useState(10000)
+  const [kernels, setKernels] = useState([])
+  const [kernel, setKernel] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [result, setResult] = useState(null)
+  const [tab, setTab] = useState('Ledger')
+
+  useEffect(() => {
+    listBenchmarks().then(setKernels).catch(() => setKernels([]))
+  }, [])
+
+  async function pickKernel(name) {
+    setKernel(name)
+    if (!name) return
+    const k = await getBenchmark(name)
+    setCode(k.source)
+    setResult(null)
+  }
+
+  async function run() {
+    setBusy(true)
     try {
-      const response = await fetch('http://localhost:5000/compile', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          source_code: code,
-          mode: mode
-        }),
-      });
-      
-      const data = await response.json();
-      setResults(data);
-    } catch (error) {
-      console.error("Compilation error:", error);
-      setResults({ success: false, error: "Failed to connect to backend compiler." });
+      setResult(await compile(code, mode, runs))
+    } catch (e) {
+      setResult({ success: false, error: `Cannot reach the compiler API (${e.message}). Start it with: python api.py` })
     } finally {
-      setIsCompiling(false);
+      setBusy(false)
     }
-  };
+  }
 
+  const ok = result?.success
   return (
-    <div className="app-container">
-      <header className="header">
-        <h1>Energy-Aware Compiler</h1>
-        <p>Integrated Semantic Analysis, IR Generation, and ML Optimization</p>
+    <div className="shell">
+      <header className="top">
+        <h1>Energy-aware compiler lab</h1>
+        <p>Compile a small C program, then see what the optimizer spent and what it bought back.</p>
       </header>
 
-      <div className="main-grid">
-        {/* Editor Panel */}
-        <div className="panel">
-          <div className="panel-header">
-            <h2><Code2 size={20} /> C Source Code</h2>
+      <main className="grid">
+        <section className="pane left" aria-label="Source and options">
+          <div className="row">
+            <label htmlFor="kernel">Example program</label>
+            <select id="kernel" value={kernel} onChange={(e) => pickKernel(e.target.value)}>
+              <option value="">Custom code</option>
+              {kernels.map((k) => (
+                <option key={k.name} value={k.name}>{k.name} - {k.description}</option>
+              ))}
+            </select>
           </div>
-          
-          <div className="code-editor-container">
-            <textarea
-              className="code-textarea"
-              value={code}
-              onChange={(e) => setCode(e.target.value)}
-              spellCheck="false"
-            />
+          <textarea className="editor" value={code} spellCheck="false" aria-label="C source"
+                    onChange={(e) => { setCode(e.target.value); setKernel('') }} />
+          <fieldset className="modes">
+            <legend>Optimization mode</legend>
+            {MODES.map((m) => (
+              <label key={m.id} className={mode === m.id ? 'on' : ''}>
+                <input type="radio" name="mode" checked={mode === m.id} onChange={() => setMode(m.id)} />
+                <b>{m.name}</b>
+                <span>{m.note}</span>
+              </label>
+            ))}
+          </fieldset>
+          <div className="row">
+            <label htmlFor="runs">Assumed executions</label>
+            <input id="runs" type="number" min="1" value={runs}
+                   onChange={(e) => setRuns(Math.max(1, Number(e.target.value) || 1))} />
           </div>
-          
-          <div className="controls">
-            <div className="mode-selector">
-              <button 
-                className={`mode-btn ${mode === '-Meco' ? 'active' : ''}`}
-                onClick={() => setMode('-Meco')}
-              >
-                <Zap size={20} />
-                Eco Mode
-                <span>Minimal Overhead</span>
-              </button>
-              <button 
-                className={`mode-btn ${mode === '-Mbalanced' ? 'active' : ''}`}
-                onClick={() => setMode('-Mbalanced')}
-              >
-                <Activity size={20} />
-                Balanced
-                <span>ML Pass Ranker</span>
-              </button>
-              <button 
-                className={`mode-btn ${mode === '-Mperf' ? 'active' : ''}`}
-                onClick={() => setMode('-Mperf')}
-              >
-                <Cpu size={20} />
-                Performance
-                <span>Max Output Speed</span>
-              </button>
-            </div>
-            
-            <button 
-              className="compile-btn" 
-              onClick={handleCompile}
-              disabled={isCompiling}
-            >
-              {isCompiling ? (
-                <><RefreshCw className="spinner" size={20} /> Compiling...</>
-              ) : (
-                <><Play size={20} /> Compile & Optimize</>
+          <button className="go" onClick={run} disabled={busy}>
+            {busy ? 'Compiling...' : 'Compile and measure'}
+          </button>
+        </section>
+
+        <section className="pane right" aria-label="Results">
+          <nav className="tabs" role="tablist">
+            {TABS.map((t) => (
+              <button key={t} role="tab" aria-selected={tab === t}
+                      className={tab === t ? 'on' : ''} onClick={() => setTab(t)}>{t}</button>
+            ))}
+          </nav>
+
+          {tab === 'Benchmarks' && <BenchmarkView />}
+
+          {tab !== 'Benchmarks' && !result && !busy && (
+            <p className="muted empty">Choose a program and compile it. Nothing is simulated: the API runs the pipeline, executes the result natively and times it.</p>
+          )}
+          {tab !== 'Benchmarks' && busy && <p className="muted empty">Running the pipeline and timing the generated code...</p>}
+
+          {tab !== 'Benchmarks' && result && !busy && (
+            <>
+              <div className={`status ${ok ? 'good' : 'bad'}`} role="status">
+                {ok
+                  ? <>Compiled and verified. <b>main()</b> returned <b>{result.return_value}</b>, identical before and after optimization.</>
+                  : <>{result.error ?? 'Compilation failed verification.'}</>}
+              </div>
+              {ok && (
+                <dl className="facts">
+                  <div><dt>Front-end</dt><dd>{ms(result.ast_time_ms / 1000)}</dd></div>
+                  <div><dt>Search</dt><dd>{ms(result.ml_time_ms / 1000)}</dd></div>
+                  <div><dt>Passes run</dt><dd>{result.selected_passes.length}</dd></div>
+                  <div><dt>Native run</dt><dd>{result.runtime_us?.toFixed(2)} us</dd></div>
+                  <div><dt>Object</dt><dd>{result.object_bytes} bytes</dd></div>
+                </dl>
               )}
-            </button>
-          </div>
-        </div>
-
-        {/* Results Panel */}
-        <div className="panel">
-          <div className="panel-header">
-            <h2><Settings2 size={20} /> Compilation Results</h2>
-          </div>
-          
-          <div className="results-panel">
-            {!results && !isCompiling && (
-              <div className="empty-state">
-                <Box size={48} />
-                <p>Click "Compile & Optimize" to see results</p>
-              </div>
-            )}
-
-            {isCompiling && (
-              <div className="empty-state">
-                <div className="spinner">
-                  <Activity size={48} color="var(--primary)" />
-                </div>
-                <p style={{marginTop: '1rem'}}>Running compiler pipeline...</p>
-              </div>
-            )}
-
-            {results && !isCompiling && (
-              <>
-                <div className="metrics-grid">
-                  <div className="metric-card">
-                    <span className="metric-label">AST + IR Emit Time</span>
-                    <span className="metric-value">{results.ast_time_ms ? results.ast_time_ms.toFixed(2) : '0'} ms</span>
-                  </div>
-                  <div className="metric-card">
-                    <span className="metric-label">ML Pass Ranker Time</span>
-                    <span className="metric-value">{results.ml_time_ms ? results.ml_time_ms.toFixed(2) : '0'} ms</span>
-                  </div>
-                  <div className="metric-card">
-                    <span className="metric-label">Predicted EDP Benefit</span>
-                    <span className="metric-value highlight">{results.predicted_edp ? results.predicted_edp.toFixed(2) : '0'}x</span>
-                  </div>
-                  <div className="metric-card">
-                    <span className="metric-label">Status</span>
-                    <span className="metric-value" style={{color: results.success ? 'var(--accent-green)' : 'var(--danger)', display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '1.2rem'}}>
-                      {results.success ? <CheckCircle2 size={20} /> : <Zap size={20} />}
-                      {results.success ? 'Success' : 'Failed'}
-                    </span>
-                  </div>
-                </div>
-
-                {results.selected_passes && (
-                  <div>
-                    <h3 className="section-title">Selected Gated Passes</h3>
-                    <div className="passes-container">
-                      {results.selected_passes.map((pass, i) => (
-                        <span key={i} className="pass-badge">{pass}</span>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                <div>
-                  <h3 className="section-title">Compiler Logs</h3>
-                  <div className="terminal-box">
-                    {results.logs && results.logs.map((log, i) => (
-                      <div key={i} className="terminal-line">{log}</div>
-                    ))}
-                    {results.error && (
-                      <div className="terminal-line" style={{color: '#BF616A'}}>{results.error}</div>
-                    )}
-                  </div>
-                </div>
-              </>
-            )}
-          </div>
-        </div>
-      </div>
+              {ok && tab === 'Ledger' && <Ledger key={result.llvm_ir + mode} result={result} initialRuns={runs} />}
+              {ok && tab === 'Gate' && <GateTable gating={result.gating} />}
+              {ok && tab === 'IR' && <IRView before={result.llvm_ir} after={result.optimized_ir} instructions={result.instructions} />}
+              {tab === 'Log' && (
+                <pre className="log" tabIndex={0}>{[...(result.logs ?? []), result.error].filter(Boolean).join('\n')}</pre>
+              )}
+            </>
+          )}
+        </section>
+      </main>
     </div>
-  );
+  )
 }
-
-// Missing icon import hack
-import { RefreshCw } from 'lucide-react';
-
-export default App;
