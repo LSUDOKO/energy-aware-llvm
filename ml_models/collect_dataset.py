@@ -48,7 +48,7 @@ from stage2.pass_gating import (
     DEFAULT_POWER_W, PROFILE_PATH, save_profiles,
 )
 from stage3_ml_model import (
-    BALANCED_RUNS, FEATURE_KEYS, TARGET_COL, relabel_savings, row_from,
+    BALANCED_RUNS, CANDIDATE_SEQUENCES, FEATURE_KEYS, TARGET_COL, relabel_savings, row_from,
     sequence_key,
 )
 
@@ -110,13 +110,10 @@ def energy_probe_batch(reader, ir_text, seq, batch: int = 10) -> float | None:
 def candidate_sequences(n_random: int = 6, seed: int = RNG_SEED) -> list[list[str]]:
     import random
     rng = random.Random(seed)
-    seqs: list[list[str]] = [
-        [],                      # baseline: no optional passes
-        ["-O1"], ["-O2"], ["-O3"],
-        ["-sroa", "-simplifycfg"],
-        ["-sroa", "-sccp", "-simplifycfg", "-gvn", "-dse"],
-        ["-loop-rotate", "-loop-unroll", "-lcsr"],
-    ]
+    # every sequence the -Mbalanced ranker can choose among must be measured,
+    # otherwise its predictions cannot be validated against real data
+    seqs: list[list[str]] = [list(s) for s in CANDIDATE_SEQUENCES]
+    seqs += [["-sroa", "-sccp", "-simplifycfg", "-gvn", "-dse"]]
     seen = {sequence_key(s) for s in seqs}
     base = len(seqs)
     tries = 0

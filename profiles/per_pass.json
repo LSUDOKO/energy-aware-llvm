@@ -5,122 +5,122 @@
     "power_w": 25.0,
     "run_j_per_unit": 1e-06,
     "run_s_per_unit": 1e-06,
-    "updated": "2026-10-04T17:27:18"
+    "updated": "2026-10-04T17:31:45"
   },
   "passes": {
     "-adce": {
-      "energy_j": 0.0016265499652945437,
-      "n_samples": 55,
-      "source": "collect_dataset",
-      "t_seconds": 6.506199861178175e-05
-    },
-    "-aggressive-instcombine": {
-      "energy_j": 0.007254487536556553,
-      "n_samples": 22,
-      "source": "collect_dataset",
-      "t_seconds": 0.0002901795014622621
-    },
-    "-constmerge": {
-      "energy_j": 0.0009529375347483438,
-      "n_samples": 22,
-      "source": "collect_dataset",
-      "t_seconds": 3.811750138993375e-05
-    },
-    "-dce": {
-      "energy_j": 0.0011388125130906701,
-      "n_samples": 66,
-      "source": "collect_dataset",
-      "t_seconds": 4.5552500523626804e-05
-    },
-    "-dse": {
-      "energy_j": 0.008030312528717332,
-      "n_samples": 66,
-      "source": "collect_dataset",
-      "t_seconds": 0.00032121250114869326
-    },
-    "-globalopt": {
-      "energy_j": 0.001430174961569719,
-      "n_samples": 11,
-      "source": "collect_dataset",
-      "t_seconds": 5.720699846278876e-05
-    },
-    "-gvn": {
-      "energy_j": 0.011371875007171184,
-      "n_samples": 55,
-      "source": "collect_dataset",
-      "t_seconds": 0.00045487500028684735
-    },
-    "-instcombine": {
-      "energy_j": 0.012054499893565662,
-      "n_samples": 33,
-      "source": "collect_dataset",
-      "t_seconds": 0.0004821799957426265
-    },
-    "-ipsccp": {
-      "energy_j": 0.0070919124482315965,
-      "n_samples": 22,
-      "source": "collect_dataset",
-      "t_seconds": 0.00028367649792926386
-    },
-    "-lcsr": {
-      "energy_j": 0.010602549991745036,
-      "n_samples": 55,
-      "source": "collect_dataset",
-      "t_seconds": 0.00042410199966980144
-    },
-    "-lcssa": {
-      "energy_j": 0.0014429249858949333,
-      "n_samples": 44,
-      "source": "collect_dataset",
-      "t_seconds": 5.7716999435797334e-05
-    },
-    "-loop-rotate": {
-      "energy_j": 0.010104775174113456,
-      "n_samples": 55,
-      "source": "collect_dataset",
-      "t_seconds": 0.00040419100696453825
-    },
-    "-loop-unroll": {
-      "energy_j": 0.00937993745537824,
-      "n_samples": 66,
-      "source": "collect_dataset",
-      "t_seconds": 0.0003751974982151296
-    },
-    "-reassociate": {
-      "energy_j": 0.001916524979606038,
-      "n_samples": 44,
-      "source": "collect_dataset",
-      "t_seconds": 7.666099918424152e-05
-    },
-    "-sccp": {
-      "energy_j": 0.007958675087138545,
+      "energy_j": 0.001865674857981503,
       "n_samples": 77,
       "source": "collect_dataset",
-      "t_seconds": 0.0003183470034855418
+      "t_seconds": 7.462699431926012e-05
     },
-    "-simplifycfg": {
-      "energy_j": 0.007932124935905449,
-      "n_samples": 121,
+    "-aggressive-instcombine": {
+      "energy_j": 0.008015949970285874,
+      "n_samples": 33,
       "source": "collect_dataset",
-      "t_seconds": 0.00031728499743621796
+      "t_seconds": 0.00032063799881143495
     },
-    "-sinking": {
-      "energy_j": 0.006301425037236186,
+    "-constmerge": {
+      "energy_j": 0.0012485250408644788,
+      "n_samples": 33,
+      "source": "collect_dataset",
+      "t_seconds": 4.994100163457915e-05
+    },
+    "-dce": {
+      "energy_j": 0.0014922250556992367,
+      "n_samples": 77,
+      "source": "collect_dataset",
+      "t_seconds": 5.968900222796947e-05
+    },
+    "-dse": {
+      "energy_j": 0.00913608746486716,
+      "n_samples": 88,
+      "source": "collect_dataset",
+      "t_seconds": 0.0003654434985946864
+    },
+    "-globalopt": {
+      "energy_j": 0.0014856000234431121,
       "n_samples": 22,
       "source": "collect_dataset",
-      "t_seconds": 0.00025205700148944743
+      "t_seconds": 5.9424000937724486e-05
     },
-    "-sroa": {
-      "energy_j": 0.009516087538941065,
+    "-gvn": {
+      "energy_j": 0.013087850038573379,
+      "n_samples": 88,
+      "source": "collect_dataset",
+      "t_seconds": 0.0005235140015429351
+    },
+    "-instcombine": {
+      "energy_j": 0.013432599916995969,
+      "n_samples": 55,
+      "source": "collect_dataset",
+      "t_seconds": 0.0005373039966798387
+    },
+    "-ipsccp": {
+      "energy_j": 0.008465999962936621,
+      "n_samples": 33,
+      "source": "collect_dataset",
+      "t_seconds": 0.00033863999851746485
+    },
+    "-lcsr": {
+      "energy_j": 0.012940387478010962,
       "n_samples": 66,
       "source": "collect_dataset",
-      "t_seconds": 0.0003806435015576426
+      "t_seconds": 0.0005176154991204385
+    },
+    "-lcssa": {
+      "energy_j": 0.0017153999579022638,
+      "n_samples": 55,
+      "source": "collect_dataset",
+      "t_seconds": 6.861599831609055e-05
+    },
+    "-loop-rotate": {
+      "energy_j": 0.011952862496400485,
+      "n_samples": 66,
+      "source": "collect_dataset",
+      "t_seconds": 0.0004781144998560194
+    },
+    "-loop-unroll": {
+      "energy_j": 0.01129020001826575,
+      "n_samples": 77,
+      "source": "collect_dataset",
+      "t_seconds": 0.00045160800073063
+    },
+    "-reassociate": {
+      "energy_j": 0.0023142500140238553,
+      "n_samples": 55,
+      "source": "collect_dataset",
+      "t_seconds": 9.257000056095421e-05
+    },
+    "-sccp": {
+      "energy_j": 0.00935615007620072,
+      "n_samples": 99,
+      "source": "collect_dataset",
+      "t_seconds": 0.0003742460030480288
+    },
+    "-simplifycfg": {
+      "energy_j": 0.008976075059763389,
+      "n_samples": 154,
+      "source": "collect_dataset",
+      "t_seconds": 0.00035904300239053555
+    },
+    "-sinking": {
+      "energy_j": 0.007621724944328889,
+      "n_samples": 33,
+      "source": "collect_dataset",
+      "t_seconds": 0.00030486899777315557
+    },
+    "-sroa": {
+      "energy_j": 0.011254624951106962,
+      "n_samples": 99,
+      "source": "collect_dataset",
+      "t_seconds": 0.00045018499804427847
     },
     "-tailcallelim": {
-      "energy_j": 0.005788387534266803,
-      "n_samples": 22,
+      "energy_j": 0.007532550080213696,
+      "n_samples": 33,
       "source": "collect_dataset",
-      "t_seconds": 0.00023153550137067214
+      "t_seconds": 0.00030130200320854783
     }
   }
 }
