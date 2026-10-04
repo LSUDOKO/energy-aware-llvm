@@ -31,3 +31,7 @@ Thumbs.db
 # IDE
 .vscode/
 .idea/
+
+# Agent/tool state
+.freebuff/
+.playwright-mcp/
