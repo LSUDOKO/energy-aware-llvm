@@ -2,25 +2,27 @@
 
 Implements plan Stage 3, mode 3 — *no* ``time.sleep`` simulation.  The GA
 searches subsets of the atomic pass set (canonical order), where each
-candidate fitness evaluation actually runs LLVM passes on the module:
+candidate fitness evaluation actually runs LLVM passes on the module and
+(by default) JIT-executes and times the result:
 
-    fitness(seq) = 1 / EDP(seq)
-    EDP(seq)     = E_compile(seq)  x  T_run_est(seq)
-    E_compile    = P-hat x (T_base + sum of measured per-pass times)
-    T_run_est    = static_cost(module after seq) x run-time-per-cost-unit
+    fitness(seq) = 1 / EDP_lifecycle(seq, n_runs)
+    EDP(n)       = (E_c + n E_r) x (T_c + n T_r)      (energy/lifecycle.py)
+    T_c          = parse/verify base + measured wall time of the passes
+    T_r          = measured native time of main() (compile once, call many)
+    E            = P-hat x T    (the package power from the profile)
 
-``T_base`` (parse/verify/codegen) and the per-pass times are real measured
-wall times (from ``profiles/per_pass.json`` when available, otherwise
-measured live).  ``static_cost`` is the documented static cost model that
-stands in for execution time when the GA cannot afford to JIT-execute
-every candidate.
+A candidate whose ``main()`` returns a different value than the unoptimized
+module is *invalid* (fitness ~0), so the search can never trade correctness
+for speed.  ``runtime_model="static"`` keeps the old cheaper proxy
+(``static_cost x run_s_per_unit``) for tests and for machines where timing
+every candidate is too slow.
 
 Search: tournament selection + uniform crossover + bit-flip mutation +
 elitism, deterministic under ``seed``, terminated by generation count or a
 wall-clock budget.  The winner is re-measured for real (full sequence run,
 JIT execution + optional object emission) and reported separately from the
-predicted fitness, per plan step "predicted during search, measured for
-the winner".
+search fitness, per plan step "predicted during search, measured for the
+winner".
 """
 from __future__ import annotations
 
@@ -29,12 +31,15 @@ import time
 from dataclasses import dataclass, field
 
 from backend.passes import AVAILABLE_PASSES, apply_pass_sequence
+from energy.lifecycle import Cost
 from stage2.extractor import static_cost, count_instructions
 from stage2.pass_gating import load_profiles, DEFAULT_POWER_W
 
 # A tiny fixed slice of base compile time (parse + verify of the module)
 # attributed to every compilation, measured live on first use.
 _DEFAULT_RUN_TIME_PER_UNIT = 1e-6  # s of program runtime per static-cost unit
+INVALID_EDP = 1e30                 # fitness ~0: failed verification/semantics
+DEFAULT_RUNS = 10_000              # executions assumed for the lifecycle EDP
 
 
 @dataclass
@@ -57,6 +62,8 @@ class GAResult:
     elapsed_s: float
     history: list[float] = field(default_factory=list)  # best fitness/gen
     measured: dict = field(default_factory=dict)        # winner re-measured
+    n_runs: int = DEFAULT_RUNS
+    runtime_model: str = "measured"
 
     def to_dict(self) -> dict:
         return {
@@ -68,6 +75,8 @@ class GAResult:
             "elapsed_s": self.elapsed_s,
             "history": list(self.history),
             "measured": dict(self.measured),
+            "n_runs": self.n_runs,
+            "runtime_model": self.runtime_model,
         }
 
 
@@ -87,7 +96,13 @@ class GeneticPassSearcher:
         seed: int = 42,
         power_w: float | None = None,
         profiles: dict | None = None,
+        n_runs: int = DEFAULT_RUNS,
+        runtime_model: str = "measured",
     ):
+        if runtime_model not in ("measured", "static"):
+            raise ValueError("runtime_model must be 'measured' or 'static'")
+        self.n_runs = n_runs
+        self.runtime_model = runtime_model
         self.ir_text = ir_text
         self.pop_size = pop_size
         self.generations = generations
@@ -112,6 +127,10 @@ class GeneticPassSearcher:
         self._parse(ir_text)
         self.t_base = max(time.perf_counter() - t0, 1e-6)
         self._cache: dict[tuple, float] = {}
+        self.base_value: int | None = None
+        if runtime_model == "measured":
+            from energy.execution import jit_run
+            self.base_value = jit_run(ir_text)   # semantics every candidate must keep
 
     # -- helpers -------------------------------------------------------------
     @staticmethod
@@ -131,8 +150,35 @@ class GeneticPassSearcher:
     def _compile_time(self, sequence: list[str]) -> float:
         return self.t_base + sum(self._pass_time(p) for p in sequence)
 
+    def _measured_edp(self, seq: list[str]) -> float:
+        """Lifecycle EDP from a real pass run and a real native timing."""
+        from energy.execution import measure_runtime
+        if seq:
+            result = apply_pass_sequence(self.ir_text, seq)
+            if not result.verified:
+                return INVALID_EDP
+            opt_ir = result.ir_text
+            t_compile = self.t_base + result.total_time
+        else:
+            opt_ir, t_compile = self.ir_text, self.t_base
+        try:
+            t_run, value = measure_runtime(opt_ir, samples=3, min_batch_s=0.0005)
+        except RuntimeError:
+            return INVALID_EDP
+        if value != self.base_value:
+            return INVALID_EDP           # optimization changed behaviour
+        cost = Cost(self.power_w * t_compile, t_compile,
+                    self.power_w * t_run, t_run)
+        return max(cost.edp(self.n_runs), 1e-30)
+
     def _edp(self, bits: tuple[int, ...]) -> float:
+        if bits in self._cache:
+            return self._cache[bits]
         seq = [p for p, b in zip(AVAILABLE_PASSES, bits) if b]
+        if self.runtime_model == "measured":
+            edp = self._measured_edp(seq)
+            self._cache[bits] = edp
+            return edp
         if not seq:
             cost_after = self.c_before
             t_compile = self.t_base
@@ -233,6 +279,8 @@ class GeneticPassSearcher:
             elapsed_s=elapsed,
             history=history,
             measured=measured,
+            n_runs=self.n_runs,
+            runtime_model=self.runtime_model,
         )
 
     def _measure_winner(self, sequence: list[str]) -> dict:
