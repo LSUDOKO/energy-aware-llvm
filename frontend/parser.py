@@ -74,6 +74,8 @@ class Parser:
             return self.parse_if()
         elif tok.type == 'WHILE_KW':
             return self.parse_while()
+        elif tok.type == 'FOR_KW':
+            return self.parse_for()
         elif tok.type == 'IDENTIFIER':
             # Assignment or (future) expression statement; assignment for now
             return self.parse_assignment()
@@ -115,13 +117,49 @@ class Parser:
         body = self.parse_block()
         return WhileStmt(cond, body, loc=(tok.line, tok.column))
 
-    def parse_assignment(self):
+    COMPOUND_OPS = {'PLUSEQ': 'PLUS', 'MINUSEQ': 'MINUS',
+                    'MULEQ': 'MUL', 'DIVEQ': 'DIV'}
+
+    def parse_simple_assignment(self):
+        """``x = e``, ``x += e`` (also -= *= /=), ``x++``, ``x--`` (no ';').
+        Compound forms are desugared to a plain assignment."""
         tok = self.consume('IDENTIFIER')
-        name = tok.value
-        self.consume('ASSIGN')
-        expr = self.parse_expression()
+        name, loc = tok.value, (tok.line, tok.column)
+        op = self.consume()
+        if op.type == 'ASSIGN':
+            return AssignStmt(name, self.parse_expression(), loc=loc)
+        if op.type in self.COMPOUND_OPS:
+            rhs = self.parse_expression()
+            return AssignStmt(name, BinaryOp(self.COMPOUND_OPS[op.type],
+                                             Identifier(name, loc=loc), rhs, loc=loc), loc=loc)
+        if op.type in ('INC', 'DEC'):
+            one = Number(1, False, loc=loc)
+            return AssignStmt(name, BinaryOp('PLUS' if op.type == 'INC' else 'MINUS',
+                                             Identifier(name, loc=loc), one, loc=loc), loc=loc)
+        raise ParseError(f"Expected assignment operator, got {op.type} at line {op.line}")
+
+    def parse_assignment(self):
+        stmt = self.parse_simple_assignment()
         self.consume('SEMI')
-        return AssignStmt(name, expr, loc=(tok.line, tok.column))
+        return stmt
+
+    def parse_for(self):
+        """``for (init; cond; step) { body }`` desugars to
+        ``{ init; while (cond) { body; step; } }`` (init is scoped to the loop)."""
+        tok = self.consume('FOR_KW')
+        self.consume('LPAREN')
+        if self.current().type in TYPE_KEYWORDS:
+            init = self.parse_var_decl()          # consumes its ';'
+        else:
+            init = self.parse_assignment()
+        cond = self.parse_expression()
+        self.consume('SEMI')
+        step = self.parse_simple_assignment()
+        self.consume('RPAREN')
+        body = self.parse_block()
+        body.statements.append(step)
+        loop = WhileStmt(cond, body, loc=(tok.line, tok.column))
+        return Block([init, loop])
 
     # ------------------------------------------------------------------
     # Expressions (precedence: equality > relational > additive >

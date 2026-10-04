@@ -21,6 +21,7 @@ class Lexer:
         ('IF_KW',      r'\bif\b'),       # if keyword
         ('ELSE_KW',    r'\belse\b'),     # else keyword
         ('WHILE_KW',   r'\bwhile\b'),    # while keyword
+        ('FOR_KW',     r'\bfor\b'),      # for keyword
         ('EQ',         r'=='),           # Equal
         ('NEQ',        r'!='),           # Not equal
         ('LE',         r'<='),           # Less or equal
@@ -28,6 +29,12 @@ class Lexer:
         ('LT',         r'<'),            # Less than
         ('GT',         r'>'),            # Greater than
         ('ASSIGN',     r'='),            # Assignment operator
+        ('INC',        r'\+\+'),         # Increment
+        ('DEC',        r'--'),           # Decrement
+        ('PLUSEQ',     r'\+='),          # Compound assignment
+        ('MINUSEQ',    r'-='),
+        ('MULEQ',      r'\*='),
+        ('DIVEQ',      r'/='),
         ('PLUS',       r'\+'),           # Addition
         ('MINUS',      r'-'),            # Subtraction / unary minus
         ('MUL',        r'\*'),           # Multiplication
