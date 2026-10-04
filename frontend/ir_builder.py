@@ -17,6 +17,8 @@ from __future__ import annotations
 
 from llvmlite import ir
 
+from frontend.numeric import INT_MIN, c_div as _c_div, f32, float_to_int, wrap_int
+
 
 def _is_const(v) -> bool:
     return isinstance(v, ir.Constant)
@@ -60,12 +62,6 @@ def _is_pow2(n) -> bool:
     return isinstance(n, int) and n > 0 and (n & (n - 1)) == 0
 
 
-def _c_div(a: int, b: int) -> int:
-    """C signed division: truncation toward zero (Python // floors)."""
-    q = abs(a) // abs(b)
-    return q if (a >= 0) == (b >= 0) else -q
-
-
 CMP_PREDICATES = {'EQ': '==', 'NEQ': '!=', 'LT': '<', 'GT': '>', 'LE': '<=', 'GE': '>='}
 
 
@@ -85,7 +81,7 @@ class SimplifyingIRBuilder:
     def add(self, a, b, name="addtmp"):
         if _is_const(a) and _is_const(b):
             self.folded += 1
-            return ir.Constant(a.type, a.constant + b.constant)
+            return ir.Constant(a.type, wrap_int(a.constant + b.constant, a.type.width))
         if _is_zero(b):
             self.identities += 1
             return a
@@ -97,7 +93,7 @@ class SimplifyingIRBuilder:
     def sub(self, a, b, name="subtmp"):
         if _is_const(a) and _is_const(b):
             self.folded += 1
-            return ir.Constant(a.type, a.constant - b.constant)
+            return ir.Constant(a.type, wrap_int(a.constant - b.constant, a.type.width))
         if _is_zero(b):
             self.identities += 1
             return a
@@ -106,7 +102,7 @@ class SimplifyingIRBuilder:
     def mul(self, a, b, name="multmp"):
         if _is_const(a) and _is_const(b):
             self.folded += 1
-            return ir.Constant(a.type, a.constant * b.constant)
+            return ir.Constant(a.type, wrap_int(a.constant * b.constant, a.type.width))
         if _is_one(a):
             self.identities += 1
             return b
@@ -115,10 +111,10 @@ class SimplifyingIRBuilder:
             return a
         if _is_zero(a):
             self.identities += 1
-            return ir.Constant(b.type, 0 if isinstance(b.type, ir.IntType) else 0.0)
+            return ir.Constant(b.type, 0)
         if _is_zero(b):
             self.identities += 1
-            return ir.Constant(a.type, 0 if isinstance(a.type, ir.IntType) else 0.0)
+            return ir.Constant(a.type, 0)
         # Strength reduction: x * 2^k -> shl x, k (two's complement safe)
         for factor, other in ((a, b), (b, a)):
             if (isinstance(factor, ir.Constant) and isinstance(factor.type, ir.IntType)
@@ -130,7 +126,8 @@ class SimplifyingIRBuilder:
 
     def sdiv(self, a, b, name="divtmp"):
         if _is_const(a) and _is_const(b):
-            if b.constant != 0:
+            # b == 0 traps at runtime; INT_MIN / -1 overflows (UB): never fold
+            if b.constant != 0 and not (a.constant == INT_MIN and b.constant == -1):
                 self.folded += 1
                 return ir.Constant(a.type, _c_div(a.constant, b.constant))
             # division by zero: leave as a runtime trap
@@ -147,7 +144,7 @@ class SimplifyingIRBuilder:
     def fadd(self, a, b, name="faddtmp"):
         if _is_const(a) and _is_const(b):
             self.folded += 1
-            return ir.Constant(a.type, a.constant + b.constant)
+            return ir.Constant(a.type, f32(a.constant + b.constant))
         if _is_zero(b):
             self.identities += 1
             return a
@@ -159,7 +156,7 @@ class SimplifyingIRBuilder:
     def fsub(self, a, b, name="fsubtmp"):
         if _is_const(a) and _is_const(b):
             self.folded += 1
-            return ir.Constant(a.type, a.constant - b.constant)
+            return ir.Constant(a.type, f32(a.constant - b.constant))
         if _is_zero(b):
             self.identities += 1
             return a
@@ -168,23 +165,20 @@ class SimplifyingIRBuilder:
     def fmul(self, a, b, name="fmultmp"):
         if _is_const(a) and _is_const(b):
             self.folded += 1
-            return ir.Constant(a.type, a.constant * b.constant)
+            return ir.Constant(a.type, f32(a.constant * b.constant))
         if _is_one(a):
             self.identities += 1
             return b
         if _is_one(b):
             self.identities += 1
             return a
-        if _is_zero(a) or _is_zero(b):
-            self.identities += 1
-            other = b if _is_zero(a) else a
-            return ir.Constant(other.type, 0.0)
+        # x * 0.0 is NOT folded: NaN/inf * 0 is NaN and -x * 0.0 is -0.0
         return self.b.fmul(a, b, name)
 
     def fdiv(self, a, b, name="fdivtmp"):
         if _is_const(a) and _is_const(b) and b.constant != 0.0:
             self.folded += 1
-            return ir.Constant(a.type, a.constant / b.constant)
+            return ir.Constant(a.type, f32(a.constant / b.constant))
         if _is_one(b):
             self.identities += 1
             return a
@@ -237,6 +231,9 @@ class SimplifyingIRBuilder:
                 '>=': a.constant >= b.constant,
             }[pred]
             return ir.Constant(ir.IntType(1), 1 if truth else 0)
+        # C semantics with NaN: every relation is false except '!=' (true)
+        if pred == '!=':
+            return self.b.fcmp_unordered(pred, a, b, name)
         return self.b.fcmp_ordered(pred, a, b, name)
 
     # ------------------------------------------------------------------
@@ -246,6 +243,8 @@ class SimplifyingIRBuilder:
     def neg(self, a, name="negtmp"):
         if _is_const(a):
             self.folded += 1
+            if isinstance(a.type, ir.IntType):
+                return ir.Constant(a.type, wrap_int(-a.constant, a.type.width))
             return ir.Constant(a.type, -a.constant)
         if isinstance(a.type, ir.FloatType):
             return self.b.fsub(ir.Constant(a.type, 0.0), a, name)
@@ -275,8 +274,10 @@ class SimplifyingIRBuilder:
                 return self.b.zext(value, self.i32, "zexttmp")
         if isinstance(value.type, ir.FloatType):
             if _is_const(value):
-                self.folded += 1
-                return ir.Constant(self.i32, int(value.constant))  # C truncation
+                folded = float_to_int(value.constant)  # C truncation
+                if folded is not None:                 # NaN/inf/overflow: UB
+                    self.folded += 1
+                    return ir.Constant(self.i32, folded)
             return self.b.fptosi(value, self.i32, "trunctmp")
         raise TypeError(f"cannot convert {value.type} to i32")
 
@@ -286,7 +287,7 @@ class SimplifyingIRBuilder:
             return value
         if _is_const(value):
             self.folded += 1
-            return ir.Constant(self.f32, float(value.constant))
+            return ir.Constant(self.f32, f32(float(value.constant)))
         if isinstance(value.type, ir.IntType) and value.type.width == 1:
-            return self.b.zext(value, self.i32, "zexttmp")
+            value = self.b.zext(value, self.i32, "zexttmp")
         return self.b.sitofp(value, self.f32, "sitofptmp")
