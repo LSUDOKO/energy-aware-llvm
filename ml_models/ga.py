@@ -267,8 +267,8 @@ class GeneticPassSearcher:
             gen_done = gen + 1
 
         pop.sort(key=lambda i: i.fitness, reverse=True)
-        winner = self._refine_finalists(pop)
-        history.append(winner.fitness)
+        history.append(pop[0].fitness)           # search-time scale (elitist)
+        winner = self._refine_finalists(pop)     # careful re-timing: own scale
         elapsed = time.perf_counter() - t_start
 
         # ---- re-measure the winner for real (plan: measured for the winner)
