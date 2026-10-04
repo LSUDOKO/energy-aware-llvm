@@ -175,13 +175,28 @@ class TestGeneticSearch:
         art = UnifiedSemanticVisitor().generate(
             Parser(Lexer(PROGRAM).tokens).parse())
         ir = str(art.module)
-        a = run_ga_search(ir, generations=2, pop_size=6, seed=123)
-        b = run_ga_search(ir, generations=2, pop_size=6, seed=123)
-        # same seed must explore the same genomes and pick the same winner;
-        # absolute fitness contains real timing noise, so compare loosely
+        # the static proxy has no timing noise: identical winner and fitness
+        a = run_ga_search(ir, generations=2, pop_size=6, seed=123,
+                          runtime_model="static")
+        b = run_ga_search(ir, generations=2, pop_size=6, seed=123,
+                          runtime_model="static")
         assert a.sequence == b.sequence
         assert a.evaluations == b.evaluations
-        assert a.fitness == pytest.approx(b.fitness, rel=0.5)
+        assert a.fitness == pytest.approx(b.fitness, rel=1e-9)
+
+    def test_measured_search_explores_the_same_genomes_under_seed(self):
+        """With real timings the winner may differ run to run (noise), but the
+        seeded search must still evaluate the same number of candidates."""
+        from ml_models.ga import run_ga_search
+        from frontend.lexer import Lexer
+        from frontend.parser import Parser
+        from frontend.semantic_codegen import UnifiedSemanticVisitor
+        art = UnifiedSemanticVisitor().generate(
+            Parser(Lexer(PROGRAM).tokens).parse())
+        ir = str(art.module)
+        a = run_ga_search(ir, generations=2, pop_size=6, seed=123)
+        b = run_ga_search(ir, generations=2, pop_size=6, seed=123)
+        assert a.evaluations == b.evaluations
 
     def test_time_budget_is_respected(self):
         from ml_models.ga import run_ga_search
