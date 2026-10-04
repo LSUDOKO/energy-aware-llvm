@@ -211,7 +211,7 @@ class TestMeasuredMLPath:
         df = cd.collect([src], n_random=2, runtime_repeats=3)
         assert len(df) >= 7  # 7 fixed candidates + up to 2 random
         for col in ("benchmark", "sequence", "t_compile_s", "runtime_s_median",
-                    "energy_source", "edp_label", "edp_savings"):
+                    "energy_source", "t_shared_s", "edp_savings"):
             assert col in df.columns, f"missing column {col}"
         # baseline row exists and has zero savings by construction
         base = df[df["sequence"] == "(none)"]

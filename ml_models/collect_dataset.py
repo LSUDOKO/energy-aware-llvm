@@ -9,8 +9,10 @@ For each benchmark x candidate pass sequence, record:
   * ``energy_compile_j`` — RAPL package energy when readable on this
     machine, otherwise blank with ``energy_source='estimated'`` and the
     label built from the documented ``P-hat x T`` software estimate,
-  * ``edp_label`` / ``edp_savings`` — EDP relative to the benchmark's
-    no-optional-pass baseline.
+  * ``t_shared_s`` — front-end + code-generation time every build pays,
+  * ``edp_savings`` — *lifecycle* EDP savings (compile once, run
+    ``BALANCED_RUNS`` times) relative to the benchmark's no-optional-pass
+    baseline; recomputable from the timing columns for any run count.
 
 Outputs:
 
@@ -39,12 +41,16 @@ sys.path.insert(0, str(ROOT))
 import pandas as pd
 
 from backend.passes import AVAILABLE_PASSES, apply_pass_sequence
+from energy.execution import jit_run, object_bytes
 from energy.experiments import merged_pipeline
 from stage2.extractor import IRFeatureExtractor, static_cost
 from stage2.pass_gating import (
     DEFAULT_POWER_W, PROFILE_PATH, save_profiles,
 )
-from stage3_ml_model import FEATURE_KEYS, TARGET_COL, row_from, sequence_key
+from stage3_ml_model import (
+    BALANCED_RUNS, FEATURE_KEYS, TARGET_COL, relabel_savings, row_from,
+    sequence_key,
+)
 
 DATASETS_DIR = ROOT / "datasets"
 MEASUREMENTS_CSV = DATASETS_DIR / "measurements.csv"
@@ -146,12 +152,17 @@ def collect(
     # warm-up parse so the first benchmark doesn't pay JIT init costs
     for src in sources:
         source = src.read_text()
+        t0 = time.perf_counter()
         ir_text = str(merged_pipeline(source).ir_text)
+        t_frontend = time.perf_counter() - t0
+        t0 = time.perf_counter()
+        object_bytes(ir_text)
+        t_shared = t_frontend + (time.perf_counter() - t0)
         features = IRFeatureExtractor(ir_text).extract_features()
+        base_value = jit_run(ir_text)   # every candidate must preserve this
         seqs = candidate_sequences(n_random)
         log(f"{src.name}: {len(seqs)} sequences")
 
-        baseline_edp = None
         bench_rows: list[dict] = []
 
         # calibrate active package power once, from real RAPL + wall time
@@ -178,11 +189,16 @@ def collect(
             # --- measured runtime (compile once, measure many) ---
             from energy.execution import measure_runtime
             try:
-                runtime, _value = measure_runtime(opt, samples=runtime_repeats)
+                runtime, value = measure_runtime(opt, samples=runtime_repeats)
                 jit_ok = True
             except RuntimeError:
                 runtime = static_cost(opt) * 1e-6
                 jit_ok = False
+                value = None
+            if jit_ok and value != base_value:
+                log(f"  {sequence_key(seq)}: CHANGED main() result "
+                    f"({value} != {base_value}), skipped")
+                continue
 
             # --- energy ---
             if reader is not None:
@@ -193,37 +209,26 @@ def collect(
                 energy = None
                 energy_source = "estimated"
 
-            e_compile = energy if energy is not None else power_w * t_compile
-            edp = e_compile * max(runtime, 1e-9)
-
             row = row_from(features, seq)
             row.update({
                 "benchmark": src.name,
                 "sequence": sequence_key(seq),
                 "t_compile_s": t_compile,
+                "t_shared_s": t_shared,
                 "runtime_s_median": runtime if jit_ok else "",
                 "instructions_before": result.instructions_before,
                 "instructions_after": result.instructions_after,
                 "static_cost_after": static_cost(opt),
                 "energy_compile_j": energy if energy is not None else "",
                 "energy_source": energy_source,
-                "edp_label": edp,
             })
             bench_rows.append(row)
-
-            if not seq:
-                baseline_edp = edp
             log(f"  {sequence_key(seq)}: T={t_compile * 1e3:.2f} ms "
-                f"run={runtime * 1e6:.0f} us EDP={edp:.3e}")
-
-        if baseline_edp is None and bench_rows:
-            baseline_edp = min(r["edp_label"] for r in bench_rows)
-        for r in bench_rows:
-            r[TARGET_COL] = ((baseline_edp - r["edp_label"]) / baseline_edp
-                             if baseline_edp else 0.0)
+                f"run={runtime * 1e6:.2f} us")
         rows.extend(bench_rows)
 
-    df = pd.DataFrame(rows)
+    df = relabel_savings(pd.DataFrame(rows), n_runs=BALANCED_RUNS,
+                         power_w=power_w)
 
     # persist per-pass profiles (median measured times) for gate + GA
     if pass_times:
