@@ -4,8 +4,13 @@
 # these are root-owned 0400 files under /sys/class/powercap.
 #
 # Usage:
-#   sudo ./energy/setup_rapl_access.sh          # grant access (survives reboot)
+#   sudo ./energy/setup_rapl_access.sh          # sudo rule (survives reboot)
+#   sudo ./energy/setup_rapl_access.sh direct   # chmod a+r counters (until reboot)
 #   sudo ./energy/setup_rapl_access.sh revert   # remove the granted access
+#
+# "direct" is the most accurate mode: the harness reads the counter file
+# itself (no sudo subprocess per sample), so timestamps are not skewed by
+# process spawn time. It does not persist across reboots.
 #
 # Strategy: install a NOPASSWD sudo rule allowing only `cat` on RAPL energy
 # files. This is the least-privilege option that survives /sys re-mounts and
@@ -16,14 +21,25 @@ set -euo pipefail
 SUDOERS_FILE="/etc/sudoers.d/rapl-energy-reader"
 RAPL_GLOB="/sys/class/powercap/intel-rapl:*/energy_uj"
 
+if [[ $EUID -ne 0 ]]; then
+  echo "Run with sudo: sudo $0 [direct|revert]" >&2
+  exit 1
+fi
+
 if [[ "${1:-}" == "revert" ]]; then
   rm -f "$SUDOERS_FILE"
-  echo "Removed $SUDOERS_FILE — RAPL access revoked."
+  for f in /sys/class/powercap/intel-rapl:*/energy_uj; do chmod 0400 "$f"; done
+  echo "Removed $SUDOERS_FILE and restored 0400 on RAPL counters."
   exit 0
 fi
 
-if [[ $EUID -ne 0 ]]; then
-  echo "Run with sudo: sudo $0" >&2
+if [[ "${1:-}" == "direct" ]]; then
+  for f in /sys/class/powercap/intel-rapl:*/energy_uj; do chmod a+r "$f"; done
+  if cat /sys/class/powercap/intel-rapl:0/energy_uj >/dev/null 2>&1; then
+    echo "OK: RAPL counters are world-readable until the next reboot."
+    exit 0
+  fi
+  echo "WARNING: chmod ran but the counter is still unreadable." >&2
   exit 1
 fi
 
