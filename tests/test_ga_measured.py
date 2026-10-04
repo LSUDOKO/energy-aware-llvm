@@ -76,3 +76,28 @@ def test_winner_never_worse_than_empty_sequence(ir):
     res = s.run()
     empty = s.fitness_of(tuple([0] * len(AVAILABLE_PASSES)))
     assert res.fitness >= empty        # elitism: the baseline was in generation 0
+
+
+def test_finalists_are_re_timed_and_best_wins(ir, monkeypatch):
+    """Search-time timings are noisy; the leaders are re-measured carefully
+    and the best *re-measured* candidate wins, not the best noisy one."""
+    s = GeneticPassSearcher(ir, n_runs=1000, seed=7, finalists=3)
+    pop = []
+    for i in range(4):
+        bits = [0] * len(AVAILABLE_PASSES)
+        bits[i] = 1
+        pop.append(ga_mod.Individual(bits=bits, fitness=100.0 - i))   # search order
+
+    careful = {tuple(p.bits): edp for p, edp in zip(pop, (5.0, 1.0, 3.0, 0.1))}
+    calls = []
+
+    def fake(seq, samples=3, min_batch_s=0.0005):
+        calls.append(samples)
+        bits = tuple(1 if p in seq else 0 for p in AVAILABLE_PASSES)
+        return careful[bits]
+
+    monkeypatch.setattr(s, "_measured_edp", fake)
+    winner = s._refine_finalists(pop)
+    assert calls == [9, 9, 9]                      # only the top 3, carefully
+    assert winner.bits == pop[1].bits              # 1.0 beats 5.0 and 3.0
+    assert winner.fitness == pytest.approx(1.0)    # 4th (0.1) was not a finalist
