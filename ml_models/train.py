@@ -44,7 +44,7 @@ def main() -> None:
 
     print(f"Training on {len(df)} measured rows "
           f"({df['benchmark'].nunique()} benchmarks x sequences)")
-    model = train_model(df)
+    model = train_model(df, source="measured")
 
     cols = FEATURE_KEYS + [f"pass{p}" for p in AVAILABLE_PASSES]
     X = df[cols].astype(float)

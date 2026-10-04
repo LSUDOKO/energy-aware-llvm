@@ -209,9 +209,13 @@ def _generate_model_labels() -> pd.DataFrame:
     return relabel_savings(frame, power_w=power) if len(frame) else frame
 
 
-def train_model(frame: pd.DataFrame | None = None) -> XGBRegressor:
-    """Train XGBoost on measured (or honestly model-labelled) data."""
-    source = "provided"
+def train_model(frame: pd.DataFrame | None = None,
+                source: str = "provided") -> XGBRegressor:
+    """Train XGBoost on measured (or honestly model-labelled) data.
+
+    ``source`` tags the model with where ``frame`` came from ('measured' for
+    ``datasets/measurements.csv``); it is ignored when ``frame`` is None.
+    """
     if frame is None:
         frame, source = _training_frame()
     if frame is None or not len(frame):
