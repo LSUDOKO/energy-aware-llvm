@@ -1,0 +1,82 @@
+{
+  "entries": [
+    {
+      "name": "fib_iter",
+      "file": "fib_iter.c",
+      "description": "iterative Fibonacci, fib(30)",
+      "expected_return": 832040,
+      "tolerance": 0
+    },
+    {
+      "name": "fib_rec",
+      "file": "fib_rec.c",
+      "description": "naive recursive Fibonacci, fib(21)",
+      "expected_return": 10946,
+      "tolerance": 0
+    },
+    {
+      "name": "gcd_euclid",
+      "file": "gcd_euclid.c",
+      "description": "Euclidean GCD, gcd(1071, 462)",
+      "expected_return": 21,
+      "tolerance": 0
+    },
+    {
+      "name": "prime_count",
+      "file": "prime_count.c",
+      "description": "primes <= 500 by trial division",
+      "expected_return": 95,
+      "tolerance": 0
+    },
+    {
+      "name": "collatz_steps",
+      "file": "collatz_steps.c",
+      "description": "longest Collatz streak below 1000",
+      "expected_return": 178,
+      "tolerance": 0
+    },
+    {
+      "name": "matmul_trace",
+      "file": "matmul_trace.c",
+      "description": "16x16 matrix diagonal trace",
+      "expected_return": 1442,
+      "tolerance": 0
+    },
+    {
+      "name": "bit_series",
+      "file": "bit_series.c",
+      "description": "popcount-weighted series to 300",
+      "expected_return": 1181,
+      "tolerance": 0
+    },
+    {
+      "name": "poly_horner",
+      "file": "poly_horner.c",
+      "description": "Horner polynomial hits, x in [0.1, 4.1]",
+      "expected_return": 400,
+      "tolerance": 0
+    },
+    {
+      "name": "newton_sqrt",
+      "file": "newton_sqrt.c",
+      "description": "Newton sqrt accuracy hits, 1..100",
+      "expected_return": 100,
+      "tolerance": 0
+    },
+    {
+      "name": "mandelbrot",
+      "file": "mandelbrot.c",
+      "description": "escape-time sum, 30x24 grid",
+      "expected_return": 7508,
+      "tolerance": 0
+    },
+    {
+      "name": "const_fold",
+      "file": "const_fold.c",
+      "description": "constant-folding showcase",
+      "expected_return": 5,
+      "tolerance": 0
+    }
+  ],
+  "note": "expected_return computed by benchmarks/reference.py (independent implementations; float kernels use float32 semantics)"
+}
