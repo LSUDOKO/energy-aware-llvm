@@ -26,7 +26,9 @@ from pathlib import Path
 from backend.passes import (AVAILABLE_PASSES, apply_pass_sequence,
                            emit_object_file)
 from energy.experiments import merged_pipeline, conventional_pipeline
-from energy.execution import jit_run
+from energy.execution import JitProgram, jit_run
+from energy.lifecycle import Cost, break_even_runs, edp_savings_pct, summarize_lifecycle
+from energy.meter import EnergyMeter
 from stage2.extractor import IRFeatureExtractor, count_instructions
 from stage2.pass_gating import (
     DEFAULT_POWER_W, CostBenefitGate, format_log, load_profiles,
@@ -34,6 +36,28 @@ from stage2.pass_gating import (
 
 MODES = ("-Meco", "-Mbalanced", "-Mperf")
 BUILD_DIR = Path(__file__).resolve().parent / "build"
+DEFAULT_RUNS = 10_000   # executions the compiled program is assumed to get
+
+_METER: EnergyMeter | None = None
+
+
+def default_meter() -> EnergyMeter:
+    """Process-wide meter (RAPL discovery and idle power are measured once)."""
+    global _METER
+    if _METER is None:
+        _METER = EnergyMeter()
+    return _METER
+
+
+def _stage_joules(meter: EnergyMeter, fn, seconds: float, power_w: float
+                  ) -> tuple[float, str]:
+    """Joules of an idempotent stage: batched RAPL reading when the counter
+    is readable, else the labelled estimate ``P-hat x T``."""
+    if meter.available:
+        m = meter.measure(fn)
+        if m.energy_j is not None:
+            return m.energy_j, "rapl"
+    return power_w * seconds, "estimated"
 
 
 def _log(logs: list, msg: str) -> None:
