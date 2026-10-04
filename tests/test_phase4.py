@@ -267,3 +267,13 @@ class TestJitProgram:
         from energy.execution import JitProgram
         with pytest.raises(RuntimeError):
             JitProgram('define i32 @other() {\nentry:\n  ret i32 0\n}\n')
+
+
+class TestObjectBytes:
+    def test_bytes_are_an_elf_object_and_match_emit_object(self, tmp_path):
+        from energy.execution import emit_object, object_bytes
+        from energy.experiments import merged_pipeline
+        ir = merged_pipeline("int main() { return 3; }").ir_text
+        data = object_bytes(ir)
+        assert data[:4] == b"\x7fELF"
+        assert emit_object(ir, tmp_path / "x.o").read_bytes()[:4] == data[:4]
