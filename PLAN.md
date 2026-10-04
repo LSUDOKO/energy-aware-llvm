@@ -1,5 +1,10 @@
 # Energy-Aware Compiler Optimization — Analysis & Implementation Plan
 
+> **Status (2026-10-04): Phases 0-6 are implemented.** Gap list G1-G13 is closed
+> except where noted in section 7. Results: `reports/benchmarks/RESULTS.md`,
+> `reports/ml/loo_evaluation.md`; method: `docs/METHODOLOGY.md`. The sections
+> below keep the original analysis; section 7 records what changed on the way.
+
 *Generated 2026-10-03 from `compiler.pdf` (project plan), `Architecture of the Project.jpeg` (OCR), and full codebase inspection.*
 
 ---
@@ -217,3 +222,38 @@ FINAL OUTCOMES
 5. Phases 4–6 as above.
 
 Estimated total: ~12–19 focused working days, matching the plan's 12-week schedule compressed for solo dev at prototype scope.
+
+
+---
+
+## 7. Outcome and deviations (added 2026-10-04)
+
+| Plan item | Outcome |
+|---|---|
+| G1 harness | `energy/` (RAPL reader, harness, meter, stats, report); committed results were produced **without RAPL** (counters root-only), so energy columns are labelled `P-hat x T` estimates. `energy/setup_rapl_access.sh direct` enables real joules. |
+| G2-G4 unified visitor | Done (Phase 2) plus numeric-semantics fixes: i32 wraparound, binary32 folding, NaN comparisons (`frontend/numeric.py`). Still deferred: `for`, `break/continue`, `&&/||`. |
+| G5-G6 metrics and gate | 52 metrics; `stage2/pass_gating.py` with auditable run/skip reasons. |
+| G7 `-Mperf` | Real GA; fitness is now lifecycle EDP from measured pass time and native runtime, candidates that change `main()` are invalid, finalists are re-timed. |
+| G8 measured ML | Dataset measured on this machine (`datasets/measurements.csv`, 242 rows); labels are lifecycle-EDP savings; leave-one-out evaluation added (ranker +14.1% vs best fixed list +14.9%). |
+| G9 real backend | LLVM new-PM passes, `object_bytes` code generation, native link/run and a C timing harness. |
+| G10-G11 tests and benchmarks | 264 tests; 11 kernels with independent references; benchmark runner and report. Writing the manifest test exposed a wrong constant in `const_fold` (fixed). |
+| G13 UI | Rebuilt: ledger with run-count slider, gate table, IR before/after, measured benchmarks. |
+
+Decisions taken: D1 = both JIT and real objects, D3 = delete the C++ skeleton,
+D4 = grow the language only as far as the kernels need, D5 = collect data on
+this AMD machine (package energy only).
+
+### Change of objective
+
+The original EDP definition `E_compile x T_run` multiplied a one-off cost by a
+single run's delay, which made every optimization look bad. All components now
+use the compile-once, run-`n`-times lifecycle EDP and report the break-even
+run count (`energy/lifecycle.py`).
+
+### Open items
+
+- Re-run `benchmarks/run_benchmarks.py` with RAPL readable to replace the
+  estimated energy columns.
+- `for`, `break/continue`, `&&/||`, arrays; larger PolyBench/MiBench kernels
+  that run for milliseconds rather than microseconds.
+- More training programs for the `-Mbalanced` ranker.
