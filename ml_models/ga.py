@@ -98,11 +98,13 @@ class GeneticPassSearcher:
         profiles: dict | None = None,
         n_runs: int = DEFAULT_RUNS,
         runtime_model: str = "measured",
+        finalists: int = 3,
     ):
         if runtime_model not in ("measured", "static"):
             raise ValueError("runtime_model must be 'measured' or 'static'")
         self.n_runs = n_runs
         self.runtime_model = runtime_model
+        self.finalists = finalists
         self.ir_text = ir_text
         self.pop_size = pop_size
         self.generations = generations
@@ -150,7 +152,8 @@ class GeneticPassSearcher:
     def _compile_time(self, sequence: list[str]) -> float:
         return self.t_base + sum(self._pass_time(p) for p in sequence)
 
-    def _measured_edp(self, seq: list[str]) -> float:
+    def _measured_edp(self, seq: list[str], samples: int = 3,
+                      min_batch_s: float = 0.0005) -> float:
         """Lifecycle EDP from a real pass run and a real native timing."""
         from energy.execution import measure_runtime
         if seq:
@@ -162,7 +165,8 @@ class GeneticPassSearcher:
         else:
             opt_ir, t_compile = self.ir_text, self.t_base
         try:
-            t_run, value = measure_runtime(opt_ir, samples=3, min_batch_s=0.0005)
+            t_run, value = measure_runtime(opt_ir, samples=samples,
+                                           min_batch_s=min_batch_s)
         except RuntimeError:
             return INVALID_EDP
         if value != self.base_value:
@@ -263,7 +267,7 @@ class GeneticPassSearcher:
             gen_done = gen + 1
 
         pop.sort(key=lambda i: i.fitness, reverse=True)
-        winner = pop[0]
+        winner = self._refine_finalists(pop)
         history.append(winner.fitness)
         elapsed = time.perf_counter() - t_start
 
@@ -282,6 +286,31 @@ class GeneticPassSearcher:
             n_runs=self.n_runs,
             runtime_model=self.runtime_model,
         )
+
+    def _refine_finalists(self, pop: list[Individual]) -> Individual:
+        """Re-time the top candidates with a larger sample and keep the best.
+
+        Search-time timings use few samples to stay cheap, so near-ties among
+        the leaders are decided by noise.  The finalists are re-measured
+        carefully before one is declared the winner.
+        """
+        if self.runtime_model != "measured" or self.finalists < 2:
+            return pop[0]
+        seen, finalists = set(), []
+        for ind in pop:
+            key = tuple(ind.bits)
+            if key not in seen:
+                seen.add(key)
+                finalists.append(ind)
+            if len(finalists) == self.finalists:
+                break
+        best, best_edp = finalists[0], float("inf")
+        for ind in finalists:
+            edp = self._measured_edp(ind.sequence, samples=9, min_batch_s=0.002)
+            ind.fitness = 1.0 / edp
+            if edp < best_edp:
+                best, best_edp = ind, edp
+        return best
 
     def _measure_winner(self, sequence: list[str]) -> dict:
         """Actually run the winning sequence + JIT execution."""
