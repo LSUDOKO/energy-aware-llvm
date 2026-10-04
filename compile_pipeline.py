@@ -26,7 +26,7 @@ from pathlib import Path
 from backend.passes import (AVAILABLE_PASSES, apply_pass_sequence,
                            emit_object_file)
 from energy.experiments import merged_pipeline, conventional_pipeline
-from energy.execution import JitProgram, jit_run
+from energy.execution import JitProgram, jit_run, object_bytes
 from energy.lifecycle import Cost, break_even_runs, edp_savings_pct, summarize_lifecycle
 from energy.meter import EnergyMeter
 from stage2.extractor import IRFeatureExtractor, count_instructions
@@ -308,13 +308,30 @@ def compile_source(
         except Exception as exc:  # pragma: no cover - defensive
             logs.append(f"-> Object emission failed: {exc}")
 
+    # ---- backend (instruction selection + emission), metered separately ----
+    # Optimizing the IR changes how much work code generation has to do, so
+    # both builds are charged for their own machine-code generation.
+    def _codegen_cost(ir: str) -> tuple[float, float]:
+        t0 = time.perf_counter()
+        object_bytes(ir)
+        seconds = time.perf_counter() - t0
+        joules, _src = _stage_joules(meter, lambda: object_bytes(ir),
+                                     seconds, power_w)
+        return seconds, joules
+
+    t_cg_opt, e_cg_opt = _codegen_cost(opt_ir)
+    t_cg_base, e_cg_base = ((t_cg_opt, e_cg_opt) if opt_ir == ir_text
+                            else _codegen_cost(ir_text))
+
     # ---------------- lifecycle EDP (plan: report E_compile and E_run) ------
-    # Baseline = same front-end + Stage 2, no optional passes.
-    # Optimized = baseline + the mode's search + scheduled passes.
-    t_base_compile = t_frontend + t_stage2
-    t_opt_compile = t_base_compile + ml_time + t_gate + passes_ms / 1000.0
-    e_base_compile = e_frontend + e_stage2
-    e_opt_compile = e_base_compile + e_search + e_passes
+    # Baseline = front-end + Stage 2 + codegen of the unoptimized IR.
+    # Optimized = front-end + Stage 2 + the mode's search + gate + scheduled
+    #             passes + codegen of the optimized IR.
+    t_base_compile = t_frontend + t_stage2 + t_cg_base
+    t_opt_compile = (t_frontend + t_stage2 + ml_time + t_gate
+                     + passes_ms / 1000.0 + t_cg_opt)
+    e_base_compile = e_frontend + e_stage2 + e_cg_base
+    e_opt_compile = e_frontend + e_stage2 + e_search + e_passes + e_cg_opt
 
     energy: dict = {
         "source": ("rapl" if "rapl" in (src_frontend, src_stage2, src_search,
@@ -331,7 +348,11 @@ def compile_source(
         "compile_time_s": t_opt_compile,
         "compile_time_baseline_s": t_base_compile,
         "stage_j": {"frontend": e_frontend, "stage2": e_stage2,
-                    "search": e_search, "passes": e_passes},
+                    "search": e_search, "passes": e_passes,
+                    "codegen": e_cg_opt},
+        "stage_s": {"frontend": t_frontend, "stage2": t_stage2,
+                    "search": ml_time, "gate": t_gate,
+                    "passes": passes_ms / 1000.0, "codegen": t_cg_opt},
     }
     if runtime_s and base_runtime_s:
         base = Cost(e_base_compile, t_base_compile, e_run_base, base_runtime_s)
