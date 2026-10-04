@@ -76,6 +76,41 @@
       "description": "constant-folding showcase",
       "expected_return": 5,
       "tolerance": 0
+    },
+    {
+      "name": "lcg_sum",
+      "file": "lcg_sum.c",
+      "description": "LCG digit sum, 2M iterations",
+      "expected_return": 8999700,
+      "tolerance": 0
+    },
+    {
+      "name": "triple_loop",
+      "file": "triple_loop.c",
+      "description": "3 nested loops, 3.4M iterations",
+      "expected_return": 480819,
+      "tolerance": 0
+    },
+    {
+      "name": "harmonic_sum",
+      "file": "harmonic_sum.c",
+      "description": "float harmonic series, 400k terms",
+      "expected_return": 13481,
+      "tolerance": 0
+    },
+    {
+      "name": "prime_below",
+      "file": "prime_below.c",
+      "description": "primes below 30000, trial division",
+      "expected_return": 3245,
+      "tolerance": 0
+    },
+    {
+      "name": "collatz_long",
+      "file": "collatz_long.c",
+      "description": "longest Collatz chain below 30000",
+      "expected_return": 307,
+      "tolerance": 0
     }
   ],
   "note": "expected_return computed by benchmarks/reference.py (independent implementations; float kernels use float32 semantics)"

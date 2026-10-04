@@ -176,6 +176,54 @@ def ref_mandelbrot() -> int:
 # ---------------------------------------------------------------------------
 # manifest
 # ---------------------------------------------------------------------------
+# ---------------------------------------------------------------------------
+# longer-running kernels (milliseconds; use for loops)
+# ---------------------------------------------------------------------------
+def ref_lcg_sum() -> int:
+    x, s = 12345, 0
+    for _ in range(2000000):
+        x = (x * 75 + 74) % 65537
+        s += x % 10
+    return s
+
+
+def ref_triple_loop() -> int:
+    return sum(1 for i in range(1, 151) for j in range(1, 151)
+               for k in range(1, 151) if (i * j + k) % 7 == 0)
+
+
+def ref_harmonic_sum() -> int:
+    s = f32(0.0)
+    for k in range(1, 400001):
+        s = f32(s + f32(f32(1.0) / f32(k)))
+    return int(f32(s * f32(1000.0)))
+
+
+def ref_prime_below() -> int:
+    count = 0
+    for n in range(2, 30000):
+        d = 2
+        prime = True
+        while d * d <= n:
+            if n % d == 0:
+                prime = False
+                break
+            d += 1
+        count += prime
+    return count
+
+
+def ref_collatz_long() -> int:
+    best = 0
+    for start in range(1, 30000):
+        n, steps = start, 0
+        while n != 1:
+            n = n // 2 if n % 2 == 0 else 3 * n + 1
+            steps += 1
+        best = max(best, steps)
+    return best
+
+
 SPECS = {
     "fib_iter": (ref_fib_iter, "iterative Fibonacci, fib(30)"),
     "fib_rec": (ref_fib_rec, "naive recursive Fibonacci, fib(21)"),
@@ -188,6 +236,11 @@ SPECS = {
     "newton_sqrt": (ref_newton_sqrt, "Newton sqrt accuracy hits, 1..100"),
     "mandelbrot": (ref_mandelbrot, "escape-time sum, 30x24 grid"),
     "const_fold": (ref_const_fold, "constant-folding showcase"),
+    "lcg_sum": (ref_lcg_sum, "LCG digit sum, 2M iterations"),
+    "triple_loop": (ref_triple_loop, "3 nested loops, 3.4M iterations"),
+    "harmonic_sum": (ref_harmonic_sum, "float harmonic series, 400k terms"),
+    "prime_below": (ref_prime_below, "primes below 30000, trial division"),
+    "collatz_long": (ref_collatz_long, "longest Collatz chain below 30000"),
 }
 
 
