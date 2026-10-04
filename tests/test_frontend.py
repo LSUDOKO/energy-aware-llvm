@@ -60,6 +60,20 @@ class TestLexer:
         b_tok = [t for t in toks if t.value == "b"][0]
         assert b_tok.line == 2
 
+    def test_line_comment_is_not_two_divisions(self):
+        kinds = [t.type for t in Lexer("int x; // note\nint y;").tokens]
+        assert "DIV" not in kinds
+        assert kinds.count("INT_KW") == 2
+
+    def test_division_still_lexes(self):
+        kinds = [t.type for t in Lexer("a / b").tokens]
+        assert kinds == ["IDENTIFIER", "DIV", "IDENTIFIER", "EOF"]
+
+    def test_block_comment_keeps_line_numbers(self):
+        toks = Lexer("/* a\nb */ int z;").tokens
+        z_tok = [t for t in toks if t.value == "z"][0]
+        assert z_tok.line == 2
+
 
 class TestSemanticChecker:
     def test_good_program_passes(self):

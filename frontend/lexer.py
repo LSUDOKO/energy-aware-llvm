@@ -31,6 +31,7 @@ class Lexer:
         ('PLUS',       r'\+'),           # Addition
         ('MINUS',      r'-'),            # Subtraction / unary minus
         ('MUL',        r'\*'),           # Multiplication
+        ('COMMENT',    r'//[^\n]*'),    # Line comments (must precede DIV)
         ('DIV',        r'/'),            # Division
         ('NOT',        r'!'),            # Logical not
         ('IDENTIFIER', r'[A-Za-z_][A-Za-z0-9_]*'), # Identifiers
@@ -42,7 +43,6 @@ class Lexer:
         ('COMMA',      r','),            # Comma
         ('WS',         r'[ \t]+'),       # Whitespace
         ('NEWLINE',    r'\n'),           # Line endings
-        ('COMMENT',    r'//.*'),         # Comments
         ('MISMATCH',   r'.'),            # Any other character
     ]
 
