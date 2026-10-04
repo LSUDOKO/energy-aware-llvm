@@ -258,6 +258,14 @@ def get_model() -> XGBRegressor:
     return train_model()
 
 
+def best_positive_index(preds) -> int | None:
+    """Index of the highest predicted EDP savings, or ``None`` when no
+    candidate is predicted to help (every prediction <= 0): the caller then
+    runs no optional passes instead of gambling on a predicted loss."""
+    best = int(np.argmax(preds))
+    return best if float(preds[best]) > 0.0 else None
+
+
 def rank_passes(features: dict, model) -> tuple[list[str], float]:
     """-Mbalanced: score the candidate pool (<50 ms) and pick the best."""
     feature_cols = FEATURE_KEYS + [f"pass{p}" for p in AVAILABLE_PASSES]
@@ -266,7 +274,9 @@ def rank_passes(features: dict, model) -> tuple[list[str], float]:
         row = row_from(features, seq)
         rows.append([row.get(c, 0.0) for c in feature_cols])
     preds = model.predict(pd.DataFrame(rows, columns=feature_cols))
-    best = int(np.argmax(preds))
+    best = best_positive_index(preds)
+    if best is None:
+        return [], 0.0
     return list(CANDIDATE_SEQUENCES[best]), float(preds[best])
 
 
