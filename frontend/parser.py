@@ -4,7 +4,7 @@ from frontend.ast_nodes import *
 COMPARISON_OPS = ('LT', 'GT', 'LE', 'GE')
 EQUALITY_OPS = ('EQ', 'NEQ')
 ADDITIVE_OPS = ('PLUS', 'MINUS')
-MULTIPLICATIVE_OPS = ('MUL', 'DIV')
+MULTIPLICATIVE_OPS = ('MUL', 'DIV', 'MOD')
 UNARY_OPS = ('MINUS', 'NOT')
 TYPE_KEYWORDS = ('INT_KW', 'FLOAT_KW')
 

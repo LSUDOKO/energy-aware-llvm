@@ -144,6 +144,8 @@ class SemanticChecker:
             rt = self._type_of_expr(expr.right, scope)
             if not (_numeric(lt) and _numeric(rt)):
                 raise SemanticError(f"operator '{expr.op}' requires numeric operands")
+            if expr.op == "MOD" and (lt == "float" or rt == "float"):
+                raise SemanticError("operator '%' requires integer operands")
             if expr.op in ("EQ", "NEQ", "LT", "GT", "LE", "GE"):
                 return "int"  # comparison result
             if lt == "float" or rt == "float":

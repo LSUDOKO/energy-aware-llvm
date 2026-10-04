@@ -245,6 +245,10 @@ class CodeGenVisitor:
             return self.builder.fmul(left, right, 'fmultmp') if is_float else self.builder.mul(left, right, 'multmp')
         elif node.op == 'DIV':
             return self.builder.fdiv(left, right, 'fdivtmp') if is_float else self.builder.sdiv(left, right, 'divtmp')
+        elif node.op == 'MOD':
+            if is_float or isinstance(right.type, ir.FloatType):
+                raise CodeGenError("'%' requires integer operands")
+            return self.builder.srem(left, right, 'remtmp')
         else:
             raise CodeGenError(f"Unknown operator {node.op}")
 

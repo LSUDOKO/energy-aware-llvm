@@ -17,7 +17,7 @@ from __future__ import annotations
 
 from llvmlite import ir
 
-from frontend.numeric import INT_MIN, c_div as _c_div, f32, float_to_int, wrap_int
+from frontend.numeric import INT_MIN, c_div as _c_div, c_rem, f32, float_to_int, wrap_int
 
 
 def _is_const(v) -> bool:
@@ -137,6 +137,17 @@ class SimplifyingIRBuilder:
             return a
         return self.b.sdiv(a, b, name)
 
+    def srem(self, a, b, name="remtmp"):
+        if _is_const(a) and _is_const(b):
+            # b == 0 traps and INT_MIN % -1 overflows (UB): leave both to runtime
+            if b.constant != 0 and not (a.constant == INT_MIN and b.constant == -1):
+                self.folded += 1
+                return ir.Constant(a.type, c_rem(a.constant, b.constant))
+        elif _is_one(b) or _is_int_const(b, -1):
+            self.identities += 1                 # x % 1 == x % -1 == 0
+            return ir.Constant(a.type, 0)
+        return self.b.srem(a, b, name)
+
     # ------------------------------------------------------------------
     # Float arithmetic
     # ------------------------------------------------------------------
@@ -197,6 +208,10 @@ class SimplifyingIRBuilder:
             return self.fmul(a, b) if isinstance(a.type, ir.FloatType) else self.mul(a, b)
         if op == 'DIV':
             return self.fdiv(a, b) if isinstance(a.type, ir.FloatType) else self.sdiv(a, b)
+        if op == 'MOD':
+            if isinstance(a.type, ir.FloatType):
+                raise ValueError("'%' requires integer operands")
+            return self.srem(a, b)
         raise ValueError(f"unknown arithmetic operator {op}")
 
     # ------------------------------------------------------------------

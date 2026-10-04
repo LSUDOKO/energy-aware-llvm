@@ -35,7 +35,7 @@ from frontend.ast_nodes import (
     Number, Program, ReturnStmt, UnaryOp, VarDecl, WhileStmt,
 )
 from frontend.ir_builder import SimplifyingIRBuilder, _is_const
-from frontend.numeric import c_div, f32, wrap_int
+from frontend.numeric import c_div, c_rem, f32, wrap_int
 
 
 class CodeGenError(Exception):
@@ -375,6 +375,9 @@ class UnifiedSemanticVisitor:
                 value = self.sb.icmp(op, lv, rv)
             return TypedValue(self.i1, value, const=_const_of(value))
 
+        if op == "MOD" and (left.is_float or right.is_float):
+            self._err(node, "operator '%' requires integer operands")
+
         if left.is_float or right.is_float:
             lv = self._coerce(left, True).value
             rv = self._coerce(right, True).value
@@ -495,6 +498,8 @@ class UnifiedSemanticVisitor:
                 if rv == 0:
                     return None  # runtime trap; don't prune on it
                 return wrap_int(c_div(lv, rv))
+            if op == "MOD":
+                return None if rv == 0 else wrap_int(c_rem(lv, rv))
             return None
         return None  # calls and anything else: runtime
 
