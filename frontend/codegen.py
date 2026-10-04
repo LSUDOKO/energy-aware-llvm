@@ -91,10 +91,12 @@ class CodeGenVisitor:
         return func
 
     def visit_Block(self, node):
+        outer = dict(self.symtab)          # lexical scope: restore on exit
         for stmt in node.statements:
             if self.builder.block.is_terminated:
                 break  # unreachable-code elimination
             self.visit(stmt)
+        self.symtab = outer
 
     def visit_VarDecl(self, node):
         var_type = self.i32 if node.var_type == 'int' else self.f32

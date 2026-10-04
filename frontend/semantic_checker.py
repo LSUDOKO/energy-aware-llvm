@@ -116,6 +116,8 @@ class SemanticChecker:
             self._check_block(stmt.then_branch, Scope(scope))
             if stmt.else_branch:
                 self._check_block(stmt.else_branch, Scope(scope))
+        elif isinstance(stmt, Block):
+            self._check_block(stmt, Scope(scope))
         elif isinstance(stmt, WhileStmt):
             ct = self._type_of_expr(stmt.condition, scope)
             if not _numeric(ct):
