@@ -24,31 +24,31 @@ readable and a *labelled* `P-hat x T` estimate otherwise (see
 
 ## What the measurements say
 
-11 kernels, 7 builds each, every object linked and run natively
+16 kernels, 7 builds each, 20 interleaved native trials, every object linked and run natively
 (AMD Ryzen 7 5700U, details in
 [reports/benchmarks/RESULTS.md](reports/benchmarks/RESULTS.md)):
 
 | build | geomean speedup vs no passes | repays its compile cost within 10,000 runs |
 |---|---:|---:|
-| `-Meco` | 1.54x | 4 of 11 kernels |
-| `-Mbalanced` | 1.38x | 4 of 11 kernels |
-| `-Mperf` | 1.75x | 0 of 11 kernels |
-| clang `-O2` (reference) | 2.98x | 4 of 11 kernels |
+| `-Meco` | 1.47x | 10 of 16 kernels |
+| `-Mbalanced` | 1.38x | 10 of 16 kernels |
+| `-Mperf` | 1.59x | 4 of 16 kernels |
+| clang `-O2` (reference) | 2.73x | 9 of 16 kernels |
 
 The honest reading:
 
 - Optimization is worth its compile energy only when the program runs enough
   times. `fib_rec` under `-Mbalanced` cuts EDP by 64.8% at 10,000 runs and
   breaks even after 688; tiny kernels (`gcd_euclid`, `const_fold`) never repay
-  even `-Meco`.
-- `-Mperf` produces the fastest code of the three modes but pays for its
+  even `-Meco`. The five newer millisecond-scale kernels repay far more
+  easily than the microsecond ones.
+- `-Mperf` produces the fastest code of the three modes (1.59x here) but pays for its
   genetic search (about 1.5-2.8 s per compile here), so it only breaks even for
   programs that run millions of times.
-- The `-Mbalanced` ranker generalizes modestly. Leave-one-benchmark-out, it
-  realizes **+14.1%** mean EDP savings (no worse than baseline on 8 of 11
-  held-out programs) against +14.9% for the best fixed pass list and -55% for
-  `-O2` ([reports/ml/loo_evaluation.md](reports/ml/loo_evaluation.md)). With 11
-  training programs that is what to expect.
+- Leave-one-benchmark-out, the `-Mbalanced` ranker realizes **+25.2%** mean EDP
+  savings (no worse than baseline on 14 of 16 held-out programs) against +23.5%
+  for the best fixed pass list and -50% for `-O2` ([reports/ml/loo_evaluation.md](reports/ml/loo_evaluation.md)). It improved from +14.1% to
+  +25.2% when the training set grew from 11 to 16 programs.
 - The unified front-end never emits more IR instructions than the conventional
   pipeline (a tested invariant on every kernel) and far fewer on constant-heavy
   code (33 -> 18).
@@ -86,7 +86,7 @@ cd web-app && npm install && npm run dev         # UI on :5173
 ## Reproducing the results
 
 ```bash
-./venv/bin/python -m pytest tests -q                       # 273 tests
+./venv/bin/python -m pytest tests -q                       # 314 tests
 ./venv/bin/python benchmarks/run_benchmarks.py             # ~85 s, writes reports/benchmarks
 ./venv/bin/python benchmarks/report_benchmarks.py          # charts + RESULTS.md
 ./venv/bin/python -m ml_models.collect_dataset             # measured training data
@@ -140,10 +140,10 @@ stage2/          52-metric extractor (llvmlite binding walk) and cost-benefit ga
 backend/         LLVM new-pass-manager runner, native link/run, timing harness
 ml_models/       dataset collection, XGBoost training, GA search (-Mperf), evaluation
 energy/          RAPL reader, harness, meter, statistics, lifecycle EDP, JIT
-benchmarks/      11 kernels, independent reference results, runner and report
+benchmarks/      16 kernels, independent reference results, runner and report
 compile_pipeline.py   Stages 1-3 end to end (shared by CLI and API)
 compiler_driver.py    command-line driver        api.py   Flask API
-web-app/         React + Vite UI                 tests/   273 tests
+web-app/         React + Vite UI                 tests/   314 tests
 docs/            architecture, methodology, screenshots
 ```
 
@@ -154,8 +154,8 @@ plan is in [PLAN.md](PLAN.md).
 ## Language subset
 
 `int` (32-bit two's complement) and `float` (binary32); functions with
-parameters, calls and recursion; `if/else`, `while`; `return`; arithmetic
-`+ - * / %`, comparisons, unary `-` and `!`; `//` and `/* */` comments. Implicit
+parameters, calls and recursion; `if/else`, `while`, `for`; `return`; arithmetic
+`+ - * / %`, compound `+= -= *= /=`, `++`/`--`, comparisons, unary `-` and `!`; `for` loops; `//` and `/* */` comments. Implicit
 int/float conversions follow C. Float literals are `float` (not `double` as in C),
 so the clang reference is compiled from float-suffixed source.
 
@@ -169,6 +169,6 @@ against C by differential tests.
   speedup ratios on the smallest kernels are not meaningful.
 - The compiler is Python/llvmlite, clang is C++: absolute compile times are
   not comparable, only their shape.
-- No `for`/`break`/`continue`, `&&`/`||`, arrays or pointers yet.
+- No `break`/`continue`, `&&`/`||`, arrays or pointers yet.
 - Energy numbers need RAPL access (see above); this repository's committed
   results were produced without it and say so.
