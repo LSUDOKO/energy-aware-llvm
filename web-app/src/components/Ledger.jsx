@@ -20,10 +20,11 @@ function Curve({ base, opt, exp }) {
     for (let e = 0; e <= MAX_EXP; e += 0.1) xs.push([e, savingsPct(base, opt, 10 ** e)])
     return xs
   }, [base, opt])
-  const lo = Math.min(-20, ...pts.map((p) => p[1]))
-  const hi = Math.max(20, ...pts.map((p) => p[1]))
+  // clamp to +-100% so one huge loss at small run counts cannot flatten the curve
+  const lo = -100, hi = 100
+  const clamp = (v) => Math.max(lo, Math.min(hi, v))
   const x = (e) => (e / MAX_EXP) * W
-  const y = (v) => H - ((v - lo) / (hi - lo)) * H
+  const y = (v) => H - ((clamp(v) - lo) / (hi - lo)) * H
   const d = pts.map(([e, v], i) => `${i ? 'L' : 'M'}${x(e).toFixed(1)},${y(v).toFixed(1)}`).join(' ')
   const here = savingsPct(base, opt, 10 ** exp)
   return (
