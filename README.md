@@ -86,7 +86,7 @@ cd web-app && npm install && npm run dev         # UI on :5173
 ## Reproducing the results
 
 ```bash
-./venv/bin/python -m pytest tests -q                       # 264 tests
+./venv/bin/python -m pytest tests -q                       # 273 tests
 ./venv/bin/python benchmarks/run_benchmarks.py             # ~85 s, writes reports/benchmarks
 ./venv/bin/python benchmarks/report_benchmarks.py          # charts + RESULTS.md
 ./venv/bin/python -m ml_models.collect_dataset             # measured training data
@@ -143,7 +143,7 @@ energy/          RAPL reader, harness, meter, statistics, lifecycle EDP, JIT
 benchmarks/      11 kernels, independent reference results, runner and report
 compile_pipeline.py   Stages 1-3 end to end (shared by CLI and API)
 compiler_driver.py    command-line driver        api.py   Flask API
-web-app/         React + Vite UI                 tests/   264 tests
+web-app/         React + Vite UI                 tests/   273 tests
 docs/            architecture, methodology, screenshots
 ```
 
@@ -155,7 +155,7 @@ plan is in [PLAN.md](PLAN.md).
 
 `int` (32-bit two's complement) and `float` (binary32); functions with
 parameters, calls and recursion; `if/else`, `while`; `return`; arithmetic
-`+ - * /`, comparisons, unary `-` and `!`; `//` and `/* */` comments. Implicit
+`+ - * / %`, comparisons, unary `-` and `!`; `//` and `/* */` comments. Implicit
 int/float conversions follow C. Float literals are `float` (not `double` as in C),
 so the clang reference is compiled from float-suffixed source.
 
@@ -169,6 +169,6 @@ against C by differential tests.
   speedup ratios on the smallest kernels are not meaningful.
 - The compiler is Python/llvmlite, clang is C++: absolute compile times are
   not comparable, only their shape.
-- No `for`/`break`/`continue`, `&&`/`||`, `%`, arrays or pointers yet.
+- No `for`/`break`/`continue`, `&&`/`||`, arrays or pointers yet.
 - Energy numbers need RAPL access (see above); this repository's committed
   results were produced without it and say so.

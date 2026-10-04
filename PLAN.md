@@ -236,7 +236,7 @@ Estimated total: ~12–19 focused working days, matching the plan's 12-week sche
 | G7 `-Mperf` | Real GA; fitness is now lifecycle EDP from measured pass time and native runtime, candidates that change `main()` are invalid, finalists are re-timed. |
 | G8 measured ML | Dataset measured on this machine (`datasets/measurements.csv`, 242 rows); labels are lifecycle-EDP savings; leave-one-out evaluation added (ranker +14.1% vs best fixed list +14.9%). |
 | G9 real backend | LLVM new-PM passes, `object_bytes` code generation, native link/run and a C timing harness. |
-| G10-G11 tests and benchmarks | 264 tests; 11 kernels with independent references; benchmark runner and report. Writing the manifest test exposed a wrong constant in `const_fold` (fixed). |
+| G10-G11 tests and benchmarks | 273 tests; 11 kernels with independent references; benchmark runner and report. Writing the manifest test exposed a wrong constant in `const_fold` (fixed). |
 | G13 UI | Rebuilt: ledger with run-count slider, gate table, IR before/after, measured benchmarks. |
 
 Decisions taken: D1 = both JIT and real objects, D3 = delete the C++ skeleton,
