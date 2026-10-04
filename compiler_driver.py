@@ -57,7 +57,10 @@ def main():
 
     # replay the stage log the API/web UI also shows
     for line in result.get('logs', []):
-        print(line)
+        try:
+            print(line)
+        except UnicodeEncodeError:
+            print(line.encode('ascii', 'replace').decode('ascii'))
 
     if not result.get('success'):
         print(f"\nCOMPILATION FAILED: {result.get('error', 'verification failed')}",

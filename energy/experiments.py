@@ -20,7 +20,10 @@ emitted work to translate, verify, and lower).
 from __future__ import annotations
 
 import argparse
-import resource
+try:
+    import resource
+except ImportError:
+    resource = None
 import sys
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -103,7 +106,9 @@ def _count_ir_instructions(ir_text: str) -> int:
 
 
 def _peak_rss_kb() -> int:
-    return resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
+    if resource:
+        return resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
+    return 0
 
 
 def run_frontend_experiment(
