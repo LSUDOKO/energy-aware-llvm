@@ -103,18 +103,19 @@ class CodeGenVisitor:
         self.symtab[node.name] = alloca
 
         if node.init_expr:
-            val = self.visit(node.init_expr)
+            val = self._coerce(self.visit(node.init_expr), var_type)
             self.builder.store(val, alloca)
 
     def visit_AssignStmt(self, node):
         if node.name not in self.symtab:
             raise CodeGenError(f"Undefined variable '{node.name}'")
-        val = self.visit(node.expr)
         ptr = self.symtab[node.name]
+        val = self._coerce(self.visit(node.expr), ptr.type.pointee)
         self.builder.store(val, ptr)
 
     def visit_ReturnStmt(self, node):
-        val = self.visit(node.expr)
+        ret_type = self.builder.function.function_type.return_type
+        val = self._coerce(self.visit(node.expr), ret_type)
         self.builder.ret(val)
 
     def visit_CallExpr(self, node):
@@ -125,7 +126,8 @@ class CodeGenVisitor:
         if len(node.args) != len(ftype.args):
             raise CodeGenError(
                 f"Function '{node.name}' expects {len(ftype.args)} argument(s), got {len(node.args)}")
-        args = [self.visit(a) for a in node.args]
+        args = [self._coerce(self.visit(a), t)
+                for a, t in zip(node.args, ftype.args)]
         return self.builder.call(func, args, 'calltmp')
 
     def visit_IfStmt(self, node):
@@ -190,6 +192,23 @@ class CodeGenVisitor:
     # Helpers
     # ------------------------------------------------------------------
 
+    def _coerce(self, value, target):
+        """Implicit int<->float conversion to ``target`` (C semantics:
+        int->float is sitofp, float->int truncates toward zero)."""
+        if value.type == target:
+            return value
+        if isinstance(target, ir.FloatType):
+            if isinstance(value.type, ir.IntType):
+                if value.type.width == 1:
+                    value = self.builder.zext(value, self.i32, 'zexttmp')
+                return self.builder.sitofp(value, target, 'sitofptmp')
+        elif isinstance(target, ir.IntType) and isinstance(value.type, ir.FloatType):
+            return self.builder.fptosi(value, target, 'trunctmp')
+        elif isinstance(target, ir.IntType) and isinstance(value.type, ir.IntType):
+            if value.type.width == 1:
+                return self.builder.zext(value, target, 'zexttmp')
+        raise CodeGenError(f"cannot convert {value.type} to {target}")
+
     def _condition_to_bool(self, cond_val):
         """Numeric -> i1 truthiness (non-zero is true)."""
         if isinstance(cond_val.type, ir.FloatType):
@@ -202,6 +221,9 @@ class CodeGenVisitor:
     def visit_BinaryOp(self, node):
         left = self.visit(node.left)
         right = self.visit(node.right)
+        if isinstance(left.type, ir.FloatType) != isinstance(right.type, ir.FloatType):
+            left = self._coerce(left, self.f32)    # usual arithmetic conversions
+            right = self._coerce(right, self.f32)
 
         if node.op in CMP_PREDICATES:
             pred = CMP_PREDICATES[node.op]
