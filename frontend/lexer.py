@@ -11,7 +11,8 @@ class LexerError(Exception):
     pass
 
 class Lexer:
-    # Define token specifications using regex
+    # Token specs; order matters (longer operators before their prefixes:
+    # ==/=, !=/!-, <=/<, >=/>).
     TOKEN_SPECS = [
         ('NUMBER',     r'\d+(\.\d*)?'),  # Integer or decimal number
         ('INT_KW',     r'\bint\b'),      # int keyword
@@ -20,15 +21,19 @@ class Lexer:
         ('IF_KW',      r'\bif\b'),       # if keyword
         ('ELSE_KW',    r'\belse\b'),     # else keyword
         ('WHILE_KW',   r'\bwhile\b'),    # while keyword
-        ('IDENTIFIER', r'[A-Za-z_][A-Za-z0-9_]*'), # Identifiers
         ('EQ',         r'=='),           # Equal
-        ('ASSIGN',     r'='),            # Assignment operator
-        ('PLUS',       r'\+'),           # Addition
-        ('MINUS',      r'-'),            # Subtraction
-        ('MUL',        r'\*'),           # Multiplication
-        ('DIV',        r'/'),            # Division
+        ('NEQ',        r'!='),           # Not equal
+        ('LE',         r'<='),           # Less or equal
+        ('GE',         r'>='),           # Greater or equal
         ('LT',         r'<'),            # Less than
         ('GT',         r'>'),            # Greater than
+        ('ASSIGN',     r'='),            # Assignment operator
+        ('PLUS',       r'\+'),           # Addition
+        ('MINUS',      r'-'),            # Subtraction / unary minus
+        ('MUL',        r'\*'),           # Multiplication
+        ('DIV',        r'/'),            # Division
+        ('NOT',        r'!'),            # Logical not
+        ('IDENTIFIER', r'[A-Za-z_][A-Za-z0-9_]*'), # Identifiers
         ('LPAREN',     r'\('),           # Left parenthesis
         ('RPAREN',     r'\)'),           # Right parenthesis
         ('LBRACE',     r'\{'),           # Left brace
@@ -40,15 +45,27 @@ class Lexer:
         ('COMMENT',    r'//.*'),         # Comments
         ('MISMATCH',   r'.'),            # Any other character
     ]
-    
+
     # Compile regex
     TOK_REGEX = '|'.join(f'(?P<{pair[0]}>{pair[1]})' for pair in TOKEN_SPECS)
     GET_TOKEN = re.compile(TOK_REGEX).match
 
     def __init__(self, code: str):
-        self.code = code
+        self.original_code = code
+        # Strip /* */ block comments while preserving newlines so that
+        # line/column tracking stays correct.
+        self.code = self._strip_block_comments(code)
         self.tokens: List[Token] = []
         self.tokenize()
+
+    @staticmethod
+    def _strip_block_comments(code: str) -> str:
+        def repl(match: "re.Match") -> str:
+            return '\n' * match.group(0).count('\n')
+        stripped = re.sub(r'/\*.*?\*/', repl, code, flags=re.DOTALL)
+        if '/*' in stripped:
+            raise LexerError('unterminated block comment')
+        return stripped
 
     def tokenize(self):
         line_num = 1

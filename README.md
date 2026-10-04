@@ -2,17 +2,21 @@
 
 This project implements the **Energy-Aware Compiler Optimization** framework from `compiler.pdf` and the architecture diagram: a fused single-pass front-end that minimizes compile energy (`E_compile`), a static IR feature extractor with energy-aware pass gating, and multi-mode pass scheduling (`-Meco`, `-Mbalanced`, `-Mperf`) that minimizes runtime energy (`E_run` and EDP).
 
-See **[PLAN.md](PLAN.md)** for the full analysis, gap list, and phased roadmap. Phases 0–1 (environment + energy measurement harness) are implemented; the unified semantic visitor (Phase 2) is next.
+See **[PLAN.md](PLAN.md)** for the full analysis, gap list, and phased roadmap. Phases 0–2 are implemented: environment + measurement harness + the unified semantic visitor with online constant folding (constant-heavy code emits **~45% fewer IR instructions** than the conventional pipeline, verified by differential JIT execution).
 
 ## Project Structure
 
 ```
 frontend/                  Stage 1: fused front-end (MiniC subset of C)
-  lexer.py                   regex lexer with line/column tracking
-  ast_nodes.py               AST node definitions
-  parser.py                  recursive-descent parser
-  codegen.py                 llvmlite IR emission
-  semantic_checker.py        standalone check-only walk (baseline pipeline stage)
+  lexer.py                  regex lexer with line/column tracking
+  ast_nodes.py              typed AST (loc, type, const_value slots)
+  parser.py                 recursive-descent parser (unary ops, calls, params)
+  codegen.py                conventional baseline emitter (no folding)
+  ir_builder.py             simplifying IR builder: folding, identities,
+                            strength reduction, lazy casts
+  semantic_codegen.py       Unified Semantic Visitor: single traversal,
+                            const propagation, branch/loop pruning
+  semantic_checker.py       standalone check-only walk (baseline pipeline stage)
 
 stage2_extractor.py        Stage 2: static IR feature extraction (early version)
 stage3_ml_model.py         Stage 3: XGBoost pass ranker (early, synthetic-data version)
@@ -20,7 +24,7 @@ compiler_driver.py         CLI driver wiring the three stages + mode flags
 api.py                     Flask API used by the web app
 web-app/                   React + Vite UI (editor, mode buttons, results)
 
-energy/                    Phase 0–1: measurement infrastructure
+energy/                    Phase 0–1: energy measurement infrastructure
   rapl_reader.py             RAPL counter access (direct/sudo/unavailable)
   setup_rapl_access.sh       one-time sudo rule to grant counter read access
   harness.py                 idle power, warm-up, interleaved paired trials,
@@ -30,7 +34,7 @@ energy/                    Phase 0–1: measurement infrastructure
   execution.py               MCJIT execution of emitted IR + object emission
   experiments.py             conventional-vs-merged front-end experiment CLI
 
-tests/                     pytest suite (33 tests: stats, harness, pipelines, JIT)
+tests/                     pytest suite (61 tests: stats, harness, pipelines, folding, JIT)
 reports/                   experiment outputs (JSON + Markdown)
 ```
 
@@ -96,9 +100,11 @@ differential-correctness check (both pipelines JIT-run to the same result).
 ./venv/bin/python -m pytest tests/ -v
 ```
 
-Covers: RAPL wrap-around math, idle correction, interleaving balance,
+Covers: RAPL wrap handling, idle correction, interleaved trial ordering,
 time-only degradation, batching, pipeline semantics, JIT differential
-execution, and object-file emission.
+execution, object-file emission, online constant folding, algebraic
+identities, strength reduction, constant propagation/invalidation, and
+branch/loop pruning.
 
 ## Methodology (per `compiler.pdf`, Part I)
 

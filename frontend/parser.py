@@ -1,6 +1,13 @@
 from frontend.lexer import Lexer, Token
 from frontend.ast_nodes import *
 
+COMPARISON_OPS = ('LT', 'GT', 'LE', 'GE')
+EQUALITY_OPS = ('EQ', 'NEQ')
+ADDITIVE_OPS = ('PLUS', 'MINUS')
+MULTIPLICATIVE_OPS = ('MUL', 'DIV')
+UNARY_OPS = ('MINUS', 'NOT')
+TYPE_KEYWORDS = ('INT_KW', 'FLOAT_KW')
+
 class ParseError(Exception):
     pass
 
@@ -31,14 +38,23 @@ class Parser:
         return Program(functions)
 
     def parse_function(self):
-        # int main() { ... }
-        ret_type = self.consume().value # 'int' or 'float'
+        start = self.current()
+        ret_type = self.consume().value  # 'int' or 'float'
         name = self.consume('IDENTIFIER').value
         self.consume('LPAREN')
-        # TODO: Parse parameters
+        params = []
+        if self.current().type != 'RPAREN':
+            while True:
+                ptype_tok = self.consume()
+                if ptype_tok.type not in TYPE_KEYWORDS:
+                    raise ParseError(f"Expected parameter type, got {ptype_tok.type} at line {ptype_tok.line}")
+                pname = self.consume('IDENTIFIER').value
+                params.append((ptype_tok.value, pname))
+                if not self.match('COMMA'):
+                    break
         self.consume('RPAREN')
         body = self.parse_block()
-        return FunctionDecl(ret_type, name, [], body)
+        return FunctionDecl(ret_type, name, params, body, loc=(start.line, start.column))
 
     def parse_block(self):
         self.consume('LBRACE')
@@ -59,28 +75,29 @@ class Parser:
         elif tok.type == 'WHILE_KW':
             return self.parse_while()
         elif tok.type == 'IDENTIFIER':
-            # Could be assignment or function call. Let's do assignment for now
+            # Assignment or (future) expression statement; assignment for now
             return self.parse_assignment()
         else:
             raise ParseError(f"Unexpected token {tok} in statement")
 
     def parse_var_decl(self):
-        var_type = self.consume().value
+        tok = self.consume()
+        var_type = tok.value
         name = self.consume('IDENTIFIER').value
         init_expr = None
         if self.match('ASSIGN'):
             init_expr = self.parse_expression()
         self.consume('SEMI')
-        return VarDecl(var_type, name, init_expr)
+        return VarDecl(var_type, name, init_expr, loc=(tok.line, tok.column))
 
     def parse_return(self):
-        self.consume('RETURN_KW')
+        tok = self.consume('RETURN_KW')
         expr = self.parse_expression()
         self.consume('SEMI')
-        return ReturnStmt(expr)
+        return ReturnStmt(expr, loc=(tok.line, tok.column))
 
     def parse_if(self):
-        self.consume('IF_KW')
+        tok = self.consume('IF_KW')
         self.consume('LPAREN')
         cond = self.parse_expression()
         self.consume('RPAREN')
@@ -88,58 +105,96 @@ class Parser:
         else_branch = None
         if self.match('ELSE_KW'):
             else_branch = self.parse_block()
-        return IfStmt(cond, then_branch, else_branch)
+        return IfStmt(cond, then_branch, else_branch, loc=(tok.line, tok.column))
 
     def parse_while(self):
-        self.consume('WHILE_KW')
+        tok = self.consume('WHILE_KW')
         self.consume('LPAREN')
         cond = self.parse_expression()
         self.consume('RPAREN')
         body = self.parse_block()
-        return WhileStmt(cond, body)
+        return WhileStmt(cond, body, loc=(tok.line, tok.column))
 
     def parse_assignment(self):
-        name = self.consume('IDENTIFIER').value
+        tok = self.consume('IDENTIFIER')
+        name = tok.value
         self.consume('ASSIGN')
         expr = self.parse_expression()
         self.consume('SEMI')
-        return AssignStmt(name, expr)
+        return AssignStmt(name, expr, loc=(tok.line, tok.column))
+
+    # ------------------------------------------------------------------
+    # Expressions (precedence: equality > relational > additive >
+    # multiplicative > unary > primary)
+    # ------------------------------------------------------------------
 
     def parse_expression(self):
         return self.parse_equality()
 
     def parse_equality(self):
+        node = self.parse_relational()
+        while tok := self._match_any(EQUALITY_OPS):
+            right = self.parse_relational()
+            node = BinaryOp(tok.type, node, right, loc=(tok.line, tok.column))
+        return node
+
+    def parse_relational(self):
         node = self.parse_additive()
-        while tok := (self.match('EQ') or self.match('LT') or self.match('GT')):
+        while tok := self._match_any(COMPARISON_OPS):
             right = self.parse_additive()
-            node = BinaryOp(tok.type, node, right)
+            node = BinaryOp(tok.type, node, right, loc=(tok.line, tok.column))
         return node
 
     def parse_additive(self):
         node = self.parse_multiplicative()
-        while tok := (self.match('PLUS') or self.match('MINUS')):
+        while tok := self._match_any(ADDITIVE_OPS):
             right = self.parse_multiplicative()
-            node = BinaryOp(tok.type, node, right)
+            node = BinaryOp(tok.type, node, right, loc=(tok.line, tok.column))
         return node
 
     def parse_multiplicative(self):
-        node = self.parse_primary()
-        while tok := (self.match('MUL') or self.match('DIV')):
-            right = self.parse_primary()
-            node = BinaryOp(tok.type, node, right)
+        node = self.parse_unary()
+        while tok := self._match_any(MULTIPLICATIVE_OPS):
+            right = self.parse_unary()
+            node = BinaryOp(tok.type, node, right, loc=(tok.line, tok.column))
         return node
+
+    def parse_unary(self):
+        tok = self.current()
+        if tok.type in UNARY_OPS:
+            self.consume()
+            operand = self.parse_unary()
+            return UnaryOp(tok.type, operand, loc=(tok.line, tok.column))
+        return self.parse_primary()
 
     def parse_primary(self):
         tok = self.consume()
         if tok.type == 'NUMBER':
             if '.' in tok.value:
-                return Number(float(tok.value), True)
-            return Number(int(tok.value), False)
+                return Number(float(tok.value), True, loc=(tok.line, tok.column))
+            return Number(int(tok.value), False, loc=(tok.line, tok.column))
         elif tok.type == 'IDENTIFIER':
-            return Identifier(tok.value)
+            if self.current().type == 'LPAREN':
+                self.consume('LPAREN')
+                args = []
+                if self.current().type != 'RPAREN':
+                    while True:
+                        args.append(self.parse_expression())
+                        if not self.match('COMMA'):
+                            break
+                self.consume('RPAREN')
+                return CallExpr(tok.value, args, loc=(tok.line, tok.column))
+            return Identifier(tok.value, loc=(tok.line, tok.column))
         elif tok.type == 'LPAREN':
             expr = self.parse_expression()
             self.consume('RPAREN')
             return expr
         else:
             raise ParseError(f"Unexpected token {tok} in expression")
+
+    def _match_any(self, types):
+        for t in types:
+            tok = self.match(t)
+            if tok is not None:
+                return tok
+        return None

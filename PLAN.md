@@ -155,7 +155,9 @@ FINAL OUTCOMES
 6. `energy/experiments.py`: runner comparing **baseline = separate-stage pipeline** (parse → check-only walk → emit walk) vs **merged = unified visitor** on the same inputs, producing front-end-only and end-to-end numbers, speedup, peak RSS (`resource.getrusage`), and E_run via running compiled programs.
 7. Unit-test harness math with fake energy counters (wrap-around, idle subtraction, CI).
 
-### Phase 2 — Unified semantic front-end (G2, G3, G4) (3–5 days)
+### Phase 2 — Unified semantic front-end (G2, G3, G4) (3–5 days) — **DONE 2026-10-04**
+
+> Delivered: typed AST slots (loc/type/const_value/value_category), `UnaryOp` and `CallExpr`, function params + forward calls, `!=`/`<=`/`>=`, `/* */` comments, `SimplifyingIRBuilder` (folding, algebraic identities, strength reduction, lazy casts), `UnifiedSemanticVisitor` (single traversal, scoped symbol table with constant facts + conservative loop/branch invalidation, pure const evaluator for pruning, effects on TypedValue, statement-level diagnostics with recovery, unreachable-code elimination). Deferred to a later increment: `&&`/`||` (short-circuit), `for`, `break`/`continue`. Result on constant-heavy code: **33 → 18 IR instructions (−45.5%)** vs conventional, differential JIT check PASS.
 8. **Typed AST** (`frontend/ast_nodes.py` v2): add `type`, `value_category`, `loc(line,col)`, `const_value` to expression nodes; add `UnaryOp`, function params/calls, `for`, `break/continue` to the language (brings it in line with "clearly documented C subset").
 9. **Lexer/parser upgrades**: unary minus/`!`, `&&/||`, params, calls, comments `/* */`; keep diagnostics with locations.
 10. **`frontend/semantic_codegen.py` — the Unified Semantic Visitor**: single traversal implementing
