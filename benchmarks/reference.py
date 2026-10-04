@@ -94,12 +94,12 @@ def ref_bit_series() -> int:
 
 
 def ref_const_fold() -> int:
-    # mix(10): 3*(4+5) - 2*7 = 17; y = 10; z = 27 -> a = 27
-    a = 10 + 17
+    # mix(10): 3*(4+5) - 2*7 = 13; y = 10; z = 23 -> a = 23
+    a = 10 + 13
     b = 64 // 4 // 4                     # 4
     f = f32(1.5) * f32(4.0) + f32(0.5)   # 6.5
     acc = 0
-    if a == 27:
+    if a == 23:
         acc += b
     while f > f32(6.0):
         acc += 1
