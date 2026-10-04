@@ -252,3 +252,18 @@ class TestMeasuredMLPath:
         assert frame[s3.TARGET_COL].notna().all()
         # the no-pass baseline row is labelled exactly zero savings
         assert (frame[frame["sequence"] == "(none)"][s3.TARGET_COL] == 0).all()
+
+
+class TestJitProgram:
+    def test_repeated_calls_are_stable(self):
+        from energy.execution import JitProgram
+        from energy.experiments import merged_pipeline
+        prog = JitProgram(str(merged_pipeline(
+            "int main() { int i = 0; int s = 0; "
+            "while (i < 10) { s = s + i; i = i + 1; } return s; }").ir_text))
+        assert [prog.call() for _ in range(3)] == [45, 45, 45]
+
+    def test_missing_entry_raises(self):
+        from energy.execution import JitProgram
+        with pytest.raises(RuntimeError):
+            JitProgram('define i32 @other() {\nentry:\n  ret i32 0\n}\n')
