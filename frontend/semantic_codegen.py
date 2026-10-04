@@ -35,6 +35,7 @@ from frontend.ast_nodes import (
     Number, Program, ReturnStmt, UnaryOp, VarDecl, WhileStmt,
 )
 from frontend.ir_builder import SimplifyingIRBuilder, _is_const
+from frontend.numeric import c_div, f32, wrap_int
 
 
 class CodeGenError(Exception):
@@ -326,10 +327,11 @@ class UnifiedSemanticVisitor:
 
     def _expr_Number(self, node: Number) -> TypedValue:
         if node.is_float:
-            return TypedValue(self.f32, ir.Constant(self.f32, float(node.value)),
-                              const=node.value, is_float=True)
-        return TypedValue(self.i32, ir.Constant(self.i32, int(node.value)),
-                          const=node.value)
+            value = f32(float(node.value))     # the literal as binary32
+            return TypedValue(self.f32, ir.Constant(self.f32, value),
+                              const=value, is_float=True)
+        value = wrap_int(int(node.value))
+        return TypedValue(self.i32, ir.Constant(self.i32, value), const=value)
 
     def _expr_Identifier(self, node: Identifier) -> TypedValue:
         sym = self._lookup(node.name, node)
@@ -452,7 +454,7 @@ class UnifiedSemanticVisitor:
         returns None unless every operand is a known compile-time constant.
         """
         if isinstance(node, Number):
-            return node.value
+            return f32(float(node.value)) if node.is_float else wrap_int(int(node.value))
         if isinstance(node, Identifier):
             for scope in reversed(self.scopes):
                 if node.name in scope:
@@ -463,7 +465,7 @@ class UnifiedSemanticVisitor:
             if v is None:
                 return None
             if node.op == "MINUS":
-                return -v
+                return -v if isinstance(v, float) else wrap_int(-v)
             if node.op == "NOT":
                 return 1 if v == 0 else 0
             return None
@@ -473,22 +475,26 @@ class UnifiedSemanticVisitor:
             if lv is None or rv is None:
                 return None
             op = node.op
-            if op == "PLUS": return lv + rv
-            if op == "MINUS": return lv - rv
-            if op == "MUL": return lv * rv
+            if op in ("EQ", "NEQ", "LT", "GT", "LE", "GE"):
+                return 1 if {
+                    "EQ": lv == rv, "NEQ": lv != rv, "LT": lv < rv,
+                    "GT": lv > rv, "LE": lv <= rv, "GE": lv >= rv,
+                }[op] else 0
+            if isinstance(lv, float) or isinstance(rv, float):
+                lv, rv = f32(float(lv)), f32(float(rv))   # binary32 arithmetic
+                if op == "PLUS": return f32(lv + rv)
+                if op == "MINUS": return f32(lv - rv)
+                if op == "MUL": return f32(lv * rv)
+                if op == "DIV":
+                    return None if rv == 0 else f32(lv / rv)
+                return None
+            if op == "PLUS": return wrap_int(lv + rv)
+            if op == "MINUS": return wrap_int(lv - rv)
+            if op == "MUL": return wrap_int(lv * rv)
             if op == "DIV":
                 if rv == 0:
                     return None  # runtime trap; don't prune on it
-                if isinstance(lv, float) or isinstance(rv, float):
-                    return lv / rv
-                q = abs(lv) // abs(rv)
-                return q if (lv >= 0) == (rv >= 0) else -q
-            if op == "EQ": return 1 if lv == rv else 0
-            if op == "NEQ": return 1 if lv != rv else 0
-            if op == "LT": return 1 if lv < rv else 0
-            if op == "GT": return 1 if lv > rv else 0
-            if op == "LE": return 1 if lv <= rv else 0
-            if op == "GE": return 1 if lv >= rv else 0
+                return wrap_int(c_div(lv, rv))
             return None
         return None  # calls and anything else: runtime
 
