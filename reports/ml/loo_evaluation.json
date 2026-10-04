@@ -1,0 +1,242 @@
+{
+  "n_runs": 10000,
+  "benchmarks": [
+    {
+      "benchmark": "bit_series.c",
+      "picked": "-sroa|-simplifycfg",
+      "by_sequence": {
+        "(none)": 0.0,
+        "-sroa|-sccp|-instcombine|-simplifycfg|-gvn|-dce": 0.23125316014667102,
+        "-sroa|-sccp|-instcombine|-simplifycfg|-gvn|-dce|-adce|-dse|-reassociate|-lcsr|-loop-rotate|-lcssa|-tailcallelim": 0.10311135372087545,
+        "-sroa|-sccp|-instcombine|-simplifycfg|-gvn|-dce|-adce|-dse|-reassociate|-lcsr|-loop-rotate|-lcssa|-tailcallelim|-aggressive-instcombine|-loop-unroll|-ipsccp|-sinking|-globalopt|-constmerge": -0.008708609881003122,
+        "-sroa|-simplifycfg": 0.4072324208775722,
+        "-sroa|-instcombine|-simplifycfg|-gvn": 0.39499743511494656,
+        "-sroa|-sccp|-simplifycfg|-gvn|-dse|-adce": 0.252250507395577,
+        "-loop-rotate|-loop-unroll|-lcsr": -0.08431320535240645,
+        "-sroa|-sccp|-instcombine|-aggressive-instcombine|-simplifycfg|-gvn|-dse|-dce|-adce|-reassociate|-lcsr|-loop-unroll|-loop-rotate|-lcssa|-tailcallelim|-sinking|-ipsccp|-constmerge|-globalopt": 0.059500123677742656
+      },
+      "predicted": 0.46556714177131653,
+      "realized": 0.4072324208775722,
+      "oracle_sequence": "-sroa|-simplifycfg",
+      "oracle": 0.4072324208775722,
+      "regret": 0.0
+    },
+    {
+      "benchmark": "collatz_steps.c",
+      "picked": "-sroa|-instcombine|-simplifycfg|-gvn",
+      "by_sequence": {
+        "(none)": 0.0,
+        "-sroa|-sccp|-instcombine|-simplifycfg|-gvn|-dce": 0.8232451414429708,
+        "-sroa|-sccp|-instcombine|-simplifycfg|-gvn|-dce|-adce|-dse|-reassociate|-lcsr|-loop-rotate|-lcssa|-tailcallelim": 0.7956145781078718,
+        "-sroa|-sccp|-instcombine|-simplifycfg|-gvn|-dce|-adce|-dse|-reassociate|-lcsr|-loop-rotate|-lcssa|-tailcallelim|-aggressive-instcombine|-loop-unroll|-ipsccp|-sinking|-globalopt|-constmerge": 0.8040211452731101,
+        "-sroa|-simplifycfg": 0.5583206847662505,
+        "-sroa|-instcombine|-simplifycfg|-gvn": 0.8219233842251551,
+        "-sroa|-sccp|-simplifycfg|-gvn|-dse|-adce": 0.5706535625792643,
+        "-loop-rotate|-loop-unroll|-lcsr": 0.03493179110796711,
+        "-sroa|-sccp|-instcombine|-aggressive-instcombine|-simplifycfg|-gvn|-dse|-dce|-adce|-reassociate|-lcsr|-loop-unroll|-loop-rotate|-lcssa|-tailcallelim|-sinking|-ipsccp|-constmerge|-globalopt": 0.8251412958271888
+      },
+      "predicted": 0.5900397300720215,
+      "realized": 0.8219233842251551,
+      "oracle_sequence": "-sroa|-sccp|-instcombine|-aggressive-instcombine|-simplifycfg|-gvn|-dse|-dce|-adce|-reassociate|-lcsr|-loop-unroll|-loop-rotate|-lcssa|-tailcallelim|-sinking|-ipsccp|-constmerge|-globalopt",
+      "oracle": 0.8251412958271888,
+      "regret": 0.003217911602033663
+    },
+    {
+      "benchmark": "const_fold.c",
+      "picked": "(none)",
+      "by_sequence": {
+        "(none)": 0.0,
+        "-sroa|-sccp|-instcombine|-simplifycfg|-gvn|-dce": -0.9171819032144584,
+        "-sroa|-sccp|-instcombine|-simplifycfg|-gvn|-dce|-adce|-dse|-reassociate|-lcsr|-loop-rotate|-lcssa|-tailcallelim": -2.5519706235932302,
+        "-sroa|-sccp|-instcombine|-simplifycfg|-gvn|-dce|-adce|-dse|-reassociate|-lcsr|-loop-rotate|-lcssa|-tailcallelim|-aggressive-instcombine|-loop-unroll|-ipsccp|-sinking|-globalopt|-constmerge": -4.480006686000417,
+        "-sroa|-simplifycfg": -0.4157180889582516,
+        "-sroa|-instcombine|-simplifycfg|-gvn": -0.9034248198340582,
+        "-sroa|-sccp|-simplifycfg|-gvn|-dse|-adce": -0.938192245280966,
+        "-loop-rotate|-loop-unroll|-lcsr": -0.592212296463964,
+        "-sroa|-sccp|-instcombine|-aggressive-instcombine|-simplifycfg|-gvn|-dse|-dce|-adce|-reassociate|-lcsr|-loop-unroll|-loop-rotate|-lcssa|-tailcallelim|-sinking|-ipsccp|-constmerge|-globalopt": -4.2605393224057755
+      },
+      "predicted": 0.0,
+      "realized": 0.0,
+      "oracle_sequence": "(none)",
+      "oracle": 0.0,
+      "regret": 0.0
+    },
+    {
+      "benchmark": "fib_iter.c",
+      "picked": "(none)",
+      "by_sequence": {
+        "(none)": 0.0,
+        "-sroa|-sccp|-instcombine|-simplifycfg|-gvn|-dce": -0.8832395461040428,
+        "-sroa|-sccp|-instcombine|-simplifycfg|-gvn|-dce|-adce|-dse|-reassociate|-lcsr|-loop-rotate|-lcssa|-tailcallelim": -2.573988805732115,
+        "-sroa|-sccp|-instcombine|-simplifycfg|-gvn|-dce|-adce|-dse|-reassociate|-lcsr|-loop-rotate|-lcssa|-tailcallelim|-aggressive-instcombine|-loop-unroll|-ipsccp|-sinking|-globalopt|-constmerge": -3.9885225850780506,
+        "-sroa|-simplifycfg": -0.6281018263449151,
+        "-sroa|-instcombine|-simplifycfg|-gvn": -0.7738463953197477,
+        "-sroa|-sccp|-simplifycfg|-gvn|-dse|-adce": -1.0575162675700083,
+        "-loop-rotate|-loop-unroll|-lcsr": -0.6837489220941905,
+        "-sroa|-sccp|-instcombine|-aggressive-instcombine|-simplifycfg|-gvn|-dse|-dce|-adce|-reassociate|-lcsr|-loop-unroll|-loop-rotate|-lcssa|-tailcallelim|-sinking|-ipsccp|-constmerge|-globalopt": -4.155689543384533
+      },
+      "predicted": 0.0,
+      "realized": 0.0,
+      "oracle_sequence": "(none)",
+      "oracle": 0.0,
+      "regret": 0.0
+    },
+    {
+      "benchmark": "fib_rec.c",
+      "picked": "(none)",
+      "by_sequence": {
+        "(none)": 0.0,
+        "-sroa|-sccp|-instcombine|-simplifycfg|-gvn|-dce": 0.34802889638915985,
+        "-sroa|-sccp|-instcombine|-simplifycfg|-gvn|-dce|-adce|-dse|-reassociate|-lcsr|-loop-rotate|-lcssa|-tailcallelim": 0.7021184644021301,
+        "-sroa|-sccp|-instcombine|-simplifycfg|-gvn|-dce|-adce|-dse|-reassociate|-lcsr|-loop-rotate|-lcssa|-tailcallelim|-aggressive-instcombine|-loop-unroll|-ipsccp|-sinking|-globalopt|-constmerge": 0.7588360112537579,
+        "-sroa|-simplifycfg": 0.41288227502595815,
+        "-sroa|-instcombine|-simplifycfg|-gvn": 0.3884902591583982,
+        "-sroa|-sccp|-simplifycfg|-gvn|-dse|-adce": 0.39946028121106136,
+        "-loop-rotate|-loop-unroll|-lcsr": 0.054013559677908676,
+        "-sroa|-sccp|-instcombine|-aggressive-instcombine|-simplifycfg|-gvn|-dse|-dce|-adce|-reassociate|-lcsr|-loop-unroll|-loop-rotate|-lcssa|-tailcallelim|-sinking|-ipsccp|-constmerge|-globalopt": 0.7172389716904314
+      },
+      "predicted": 0.0,
+      "realized": 0.0,
+      "oracle_sequence": "-sroa|-sccp|-instcombine|-simplifycfg|-gvn|-dce|-adce|-dse|-reassociate|-lcsr|-loop-rotate|-lcssa|-tailcallelim|-aggressive-instcombine|-loop-unroll|-ipsccp|-sinking|-globalopt|-constmerge",
+      "oracle": 0.7588360112537579,
+      "regret": 0.7588360112537579
+    },
+    {
+      "benchmark": "gcd_euclid.c",
+      "picked": "-sroa|-simplifycfg",
+      "by_sequence": {
+        "(none)": 0.0,
+        "-sroa|-sccp|-instcombine|-simplifycfg|-gvn|-dce": -1.0003842475833142,
+        "-sroa|-sccp|-instcombine|-simplifycfg|-gvn|-dce|-adce|-dse|-reassociate|-lcsr|-loop-rotate|-lcssa|-tailcallelim": -2.408929252094082,
+        "-sroa|-sccp|-instcombine|-simplifycfg|-gvn|-dce|-adce|-dse|-reassociate|-lcsr|-loop-rotate|-lcssa|-tailcallelim|-aggressive-instcombine|-loop-unroll|-ipsccp|-sinking|-globalopt|-constmerge": -3.7672463583155253,
+        "-sroa|-simplifycfg": -0.35626527146613846,
+        "-sroa|-instcombine|-simplifycfg|-gvn": -0.9751370507265174,
+        "-sroa|-sccp|-simplifycfg|-gvn|-dse|-adce": -1.0820103866856037,
+        "-loop-rotate|-loop-unroll|-lcsr": -0.6106472194578343,
+        "-sroa|-sccp|-instcombine|-aggressive-instcombine|-simplifycfg|-gvn|-dse|-dce|-adce|-reassociate|-lcsr|-loop-unroll|-loop-rotate|-lcssa|-tailcallelim|-sinking|-ipsccp|-constmerge|-globalopt": -3.915573280300119
+      },
+      "predicted": 0.525629997253418,
+      "realized": -0.35626527146613846,
+      "oracle_sequence": "(none)",
+      "oracle": 0.0,
+      "regret": 0.35626527146613846
+    },
+    {
+      "benchmark": "mandelbrot.c",
+      "picked": "-sroa|-sccp|-instcombine|-simplifycfg|-gvn|-dce|-adce|-dse|-reassociate|-lcsr|-loop-rotate|-lcssa|-tailcallelim",
+      "by_sequence": {
+        "(none)": 0.0,
+        "-sroa|-sccp|-instcombine|-simplifycfg|-gvn|-dce": 0.8002376335116713,
+        "-sroa|-sccp|-instcombine|-simplifycfg|-gvn|-dce|-adce|-dse|-reassociate|-lcsr|-loop-rotate|-lcssa|-tailcallelim": 0.7981580566536698,
+        "-sroa|-sccp|-instcombine|-simplifycfg|-gvn|-dce|-adce|-dse|-reassociate|-lcsr|-loop-rotate|-lcssa|-tailcallelim|-aggressive-instcombine|-loop-unroll|-ipsccp|-sinking|-globalopt|-constmerge": 0.786571925341417,
+        "-sroa|-simplifycfg": 0.7934624290547287,
+        "-sroa|-instcombine|-simplifycfg|-gvn": 0.7771493170610682,
+        "-sroa|-sccp|-simplifycfg|-gvn|-dse|-adce": 0.7798106030623153,
+        "-loop-rotate|-loop-unroll|-lcsr": -0.26157554549492856,
+        "-sroa|-sccp|-instcombine|-aggressive-instcombine|-simplifycfg|-gvn|-dse|-dce|-adce|-reassociate|-lcsr|-loop-unroll|-loop-rotate|-lcssa|-tailcallelim|-sinking|-ipsccp|-constmerge|-globalopt": 0.7831390785956394
+      },
+      "predicted": 0.964331865310669,
+      "realized": 0.7981580566536698,
+      "oracle_sequence": "-sroa|-sccp|-instcombine|-simplifycfg|-gvn|-dce",
+      "oracle": 0.8002376335116713,
+      "regret": 0.0020795768580015306
+    },
+    {
+      "benchmark": "matmul_trace.c",
+      "picked": "-sroa|-sccp|-instcombine|-simplifycfg|-gvn|-dce|-adce|-dse|-reassociate|-lcsr|-loop-rotate|-lcssa|-tailcallelim",
+      "by_sequence": {
+        "(none)": 0.0,
+        "-sroa|-sccp|-instcombine|-simplifycfg|-gvn|-dce": -0.38540490258759746,
+        "-sroa|-sccp|-instcombine|-simplifycfg|-gvn|-dce|-adce|-dse|-reassociate|-lcsr|-loop-rotate|-lcssa|-tailcallelim": -0.6963069344218734,
+        "-sroa|-sccp|-instcombine|-simplifycfg|-gvn|-dce|-adce|-dse|-reassociate|-lcsr|-loop-rotate|-lcssa|-tailcallelim|-aggressive-instcombine|-loop-unroll|-ipsccp|-sinking|-globalopt|-constmerge": -1.2071247488773524,
+        "-sroa|-simplifycfg": -0.010273002115971118,
+        "-sroa|-instcombine|-simplifycfg|-gvn": -0.18359619041760084,
+        "-sroa|-sccp|-simplifycfg|-gvn|-dse|-adce": -0.3844837977049789,
+        "-loop-rotate|-loop-unroll|-lcsr": -0.13515535405070106,
+        "-sroa|-sccp|-instcombine|-aggressive-instcombine|-simplifycfg|-gvn|-dse|-dce|-adce|-reassociate|-lcsr|-loop-unroll|-loop-rotate|-lcssa|-tailcallelim|-sinking|-ipsccp|-constmerge|-globalopt": -1.0617783959198197
+      },
+      "predicted": 0.7936541438102722,
+      "realized": -0.6963069344218734,
+      "oracle_sequence": "(none)",
+      "oracle": 0.0,
+      "regret": 0.6963069344218734
+    },
+    {
+      "benchmark": "newton_sqrt.c",
+      "picked": "-sroa|-simplifycfg",
+      "by_sequence": {
+        "(none)": 0.0,
+        "-sroa|-sccp|-instcombine|-simplifycfg|-gvn|-dce": 0.6795736194426101,
+        "-sroa|-sccp|-instcombine|-simplifycfg|-gvn|-dce|-adce|-dse|-reassociate|-lcsr|-loop-rotate|-lcssa|-tailcallelim": 0.6691401355076327,
+        "-sroa|-sccp|-instcombine|-simplifycfg|-gvn|-dce|-adce|-dse|-reassociate|-lcsr|-loop-rotate|-lcssa|-tailcallelim|-aggressive-instcombine|-loop-unroll|-ipsccp|-sinking|-globalopt|-constmerge": 0.6323193951721141,
+        "-sroa|-simplifycfg": 0.7171408856745739,
+        "-sroa|-instcombine|-simplifycfg|-gvn": 0.6843947852037968,
+        "-sroa|-sccp|-simplifycfg|-gvn|-dse|-adce": 0.6812560869151301,
+        "-loop-rotate|-loop-unroll|-lcsr": 0.1695032390034562,
+        "-sroa|-sccp|-instcombine|-aggressive-instcombine|-simplifycfg|-gvn|-dse|-dce|-adce|-reassociate|-lcsr|-loop-unroll|-loop-rotate|-lcssa|-tailcallelim|-sinking|-ipsccp|-constmerge|-globalopt": 0.6006591917957396
+      },
+      "predicted": 0.7785123586654663,
+      "realized": 0.7171408856745739,
+      "oracle_sequence": "-sroa|-simplifycfg",
+      "oracle": 0.7171408856745739,
+      "regret": 0.0
+    },
+    {
+      "benchmark": "poly_horner.c",
+      "picked": "(none)",
+      "by_sequence": {
+        "(none)": 0.0,
+        "-sroa|-sccp|-instcombine|-simplifycfg|-gvn|-dce": -0.2303140075765479,
+        "-sroa|-sccp|-instcombine|-simplifycfg|-gvn|-dce|-adce|-dse|-reassociate|-lcsr|-loop-rotate|-lcssa|-tailcallelim": -0.779120261855185,
+        "-sroa|-sccp|-instcombine|-simplifycfg|-gvn|-dce|-adce|-dse|-reassociate|-lcsr|-loop-rotate|-lcssa|-tailcallelim|-aggressive-instcombine|-loop-unroll|-ipsccp|-sinking|-globalopt|-constmerge": -1.1876295991435117,
+        "-sroa|-simplifycfg": -0.07920560513941947,
+        "-sroa|-instcombine|-simplifycfg|-gvn": -0.3192086342262511,
+        "-sroa|-sccp|-simplifycfg|-gvn|-dse|-adce": -0.4318372729631755,
+        "-loop-rotate|-loop-unroll|-lcsr": -0.4909672250815792,
+        "-sroa|-sccp|-instcombine|-aggressive-instcombine|-simplifycfg|-gvn|-dse|-dce|-adce|-reassociate|-lcsr|-loop-unroll|-loop-rotate|-lcssa|-tailcallelim|-sinking|-ipsccp|-constmerge|-globalopt": -1.2361395325232685
+      },
+      "predicted": 0.0,
+      "realized": 0.0,
+      "oracle_sequence": "(none)",
+      "oracle": 0.0,
+      "regret": 0.0
+    },
+    {
+      "benchmark": "prime_count.c",
+      "picked": "-sroa|-sccp|-instcombine|-simplifycfg|-gvn|-dce|-adce|-dse|-reassociate|-lcsr|-loop-rotate|-lcssa|-tailcallelim|-aggressive-instcombine|-loop-unroll|-ipsccp|-sinking|-globalopt|-constmerge",
+      "by_sequence": {
+        "(none)": 0.0,
+        "-sroa|-sccp|-instcombine|-simplifycfg|-gvn|-dce": 0.03415980418642019,
+        "-sroa|-sccp|-instcombine|-simplifycfg|-gvn|-dce|-adce|-dse|-reassociate|-lcsr|-loop-rotate|-lcssa|-tailcallelim": -0.12687497127682718,
+        "-sroa|-sccp|-instcombine|-simplifycfg|-gvn|-dce|-adce|-dse|-reassociate|-lcsr|-loop-rotate|-lcssa|-tailcallelim|-aggressive-instcombine|-loop-unroll|-ipsccp|-sinking|-globalopt|-constmerge": -0.1355620331330162,
+        "-sroa|-simplifycfg": 0.24275383679275142,
+        "-sroa|-instcombine|-simplifycfg|-gvn": 0.32877790291225006,
+        "-sroa|-sccp|-simplifycfg|-gvn|-dse|-adce": 0.3566756042693316,
+        "-loop-rotate|-loop-unroll|-lcsr": 0.4199268745849599,
+        "-sroa|-sccp|-instcombine|-aggressive-instcombine|-simplifycfg|-gvn|-dse|-dce|-adce|-reassociate|-lcsr|-loop-unroll|-loop-rotate|-lcssa|-tailcallelim|-sinking|-ipsccp|-constmerge|-globalopt": 0.2591999633180125
+      },
+      "predicted": 0.8341865539550781,
+      "realized": -0.1355620331330162,
+      "oracle_sequence": "-loop-rotate|-loop-unroll|-lcsr",
+      "oracle": 0.4199268745849599,
+      "regret": 0.5554889077179761
+    }
+  ],
+  "mean_realized": 0.14148368258272206,
+  "mean_oracle": 0.3571377383390658,
+  "fixed_policies": {
+    "never optimize": 0.0,
+    "O1": -0.0454569410860416,
+    "O2": -0.5517316600528303,
+    "O3": -1.0720956493989524,
+    "sroa+simplifycfg": 0.1492935216515581,
+    "sroa+instcombine+simplifycfg+gvn": 0.021865453922858123,
+    "sroa+sccp+simplifycfg+gvn+dse+adce": -0.07763030225200479,
+    "loop-rotate+loop-unroll+lcsr": -0.19820402760193742,
+    "all passes": -1.0349855863298874
+  },
+  "best_fixed_policy": "sroa+simplifycfg",
+  "mean_regret": 0.21565405575634375,
+  "never_worse_than_baseline": 8,
+  "n_benchmarks": 11
+}
