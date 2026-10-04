@@ -80,6 +80,8 @@ def compile_source(
     emit_object: bool = True,
     name: str = "a",
     ga_kwargs: dict | None = None,
+    n_runs: int = DEFAULT_RUNS,
+    meter: EnergyMeter | None = None,
 ) -> dict:
     """Compile MiniC source under `mode`; returns a result dict.
 
@@ -91,6 +93,7 @@ def compile_source(
     if mode not in MODES:
         raise ValueError(f"unknown mode {mode!r}; expected one of {MODES}")
 
+    meter = meter or default_meter()
     logs: list[str] = []
     result: dict = {"success": True, "mode": mode, "logs": logs}
 
@@ -124,6 +127,11 @@ def compile_source(
     t0 = time.perf_counter()
     features = IRFeatureExtractor(ir_text).extract_features()
     t_stage2 = time.perf_counter() - t0
+    e_frontend, src_frontend = _stage_joules(
+        meter, lambda: merged_pipeline(source), t_frontend, power_w)
+    e_stage2, src_stage2 = _stage_joules(
+        meter, lambda: IRFeatureExtractor(ir_text).extract_features(),
+        t_stage2, power_w)
     result["features"] = features
     logs.append(f"-> Extracted {len(features)} IR metrics "
                 f"(baseline static cost {features['static_cost']:.0f}, "
@@ -142,6 +150,7 @@ def compile_source(
         logs.append("-> Gate evaluates every optional pass under the strict "
                     "eco budget; only passes that repay their compile cost run.")
         candidate = list(AVAILABLE_PASSES)
+        e_search, src_search = 0.0, "none"
 
     elif mode == "-Mbalanced":
         logs.append("-> Mode: -Mbalanced (ML Pass Ranker on measured data)")
@@ -150,6 +159,8 @@ def compile_source(
         model = get_model()
         candidate, pred_benefit = rank_passes(features, model)
         ml_time = time.perf_counter() - t0
+        e_search, src_search = _stage_joules(
+            meter, lambda: rank_passes(features, model), ml_time, power_w)
         source_tag = getattr(model, "training_source", "?")
         logs.append(f"-> ML Pass Ranker completed in {ml_time * 1000:.2f} ms "
                     f"(model trained on: {source_tag})")
@@ -159,9 +170,25 @@ def compile_source(
     else:  # -Mperf
         logs.append("-> Mode: -Mperf (Genetic Algorithm Search Loop, 1/EDP)")
         from ml_models.ga import run_ga_search
+        holder: dict = {}
+
+        def _search() -> None:
+            holder["ga"] = run_ga_search(ir_text, **(ga_kwargs or {}))
+
         t0 = time.perf_counter()
-        ga = run_ga_search(ir_text, **(ga_kwargs or {}))
+        # the search is stochastic and long: meter the one real execution
+        # instead of repeating it
+        if meter.available:
+            m = meter.measure(_search, calls=1)
+            e_search = m.energy_j
+            src_search = "rapl"
+        else:
+            _search()
+            e_search, src_search = None, "estimated"
         ml_time = time.perf_counter() - t0
+        if e_search is None:
+            e_search = power_w * ml_time
+        ga = holder["ga"]
         candidate = ga.sequence
         pred_benefit = ga.fitness
         result["ga"] = ga.to_dict()
@@ -176,8 +203,10 @@ def compile_source(
                         f"runtime={m.get('runtime_s_median', 0) * 1e6:.0f} us")
 
     # ---- energy-aware gate decides, pass for pass (auditable) ----
+    t0 = time.perf_counter()
     gate = CostBenefitGate(budget=gate_budget, profiles=profiles)
     scheduled, decisions = gate.scheduled_passes(ir_text, candidate)
+    t_gate = time.perf_counter() - t0
     result["gating"] = {
         "budget": gate_budget,
         "lambda": gate.lambda_,
@@ -208,6 +237,12 @@ def compile_source(
         verified = True
         instr_before = instr_after = count_instructions(ir_text)
     t_backend = time.perf_counter() - t0
+    if scheduled:
+        e_passes, src_passes = _stage_joules(
+            meter, lambda: apply_pass_sequence(ir_text, scheduled),
+            passes_ms / 1000.0, power_w)
+    else:
+        e_passes, src_passes = 0.0, "none"
 
     result["optimized_ir"] = opt_ir
     result["passes_time_ms"] = passes_ms
@@ -228,14 +263,36 @@ def compile_source(
         logs.append(f"-> JIT error: {exc}")
     result["differential_ok"] = differential_ok
 
-    # ---- measured native runtime of the optimized program ----
+    # ---- measured native runtime (E_run inputs), baseline and optimized ----
+    runtime_s = base_runtime_s = None
+    e_run_opt = e_run_base = None
+    run_source = "estimated"
     try:
         runtime_s, rt_value = _measure_runtime(opt_ir)
         result["runtime_us"] = runtime_s * 1e6
         result["return_value"] = rt_value
+        if scheduled:
+            base_runtime_s, _ = _measure_runtime(ir_text)
+        else:
+            base_runtime_s = runtime_s
+        result["baseline_runtime_us"] = base_runtime_s * 1e6
+
+        def _run_joules(ir: str, seconds: float) -> float:
+            nonlocal run_source
+            if meter.available:
+                prog = JitProgram(ir)
+                m = meter.measure(prog.call)
+                if m.energy_j is not None:
+                    run_source = "rapl"
+                    return m.energy_j
+            return power_w * seconds
+
+        e_run_opt = _run_joules(opt_ir, runtime_s)
+        e_run_base = (_run_joules(ir_text, base_runtime_s) if scheduled
+                      else e_run_opt)
     except RuntimeError:
-        runtime_s = None
         result["runtime_us"] = None
+        result["baseline_runtime_us"] = None
 
     # ---- real object file ----
     obj_path = None
@@ -250,41 +307,64 @@ def compile_source(
         except Exception as exc:  # pragma: no cover - defensive
             logs.append(f"-> Object emission failed: {exc}")
 
-    # ---------------- EDP breakdown (plan: report E_compile & E_run) --------
-    total_compile_s = (t_frontend + t_stage2 + ml_time
-                       + (passes_ms / 1000.0))
-    e_compile_est = power_w * total_compile_s
-    runtime_for_edp = runtime_s if runtime_s else 0.0
-    edp = e_compile_est * runtime_for_edp
+    # ---------------- lifecycle EDP (plan: report E_compile and E_run) ------
+    # Baseline = same front-end + Stage 2, no optional passes.
+    # Optimized = baseline + the mode's search + scheduled passes.
+    t_base_compile = t_frontend + t_stage2
+    t_opt_compile = t_base_compile + ml_time + t_gate + passes_ms / 1000.0
+    e_base_compile = e_frontend + e_stage2
+    e_opt_compile = e_base_compile + e_search + e_passes
 
-    # baseline: same front-end, no optional passes
-    base_compile_s = t_frontend + t_stage2
-    e_base = power_w * base_compile_s
-    edp_baseline = e_base * (runtime_for_edp or 1.0)
-    savings = ((edp_baseline - edp) / edp_baseline * 100.0
-               if edp_baseline > 0 else 0.0)
-
-    result["energy"] = {
-        "source": result["power_source"],
-        "e_compile_j": e_compile_est,
-        "e_compile_note": ("P-hat x T (software estimate; run "
-                           "energy/setup_rapl_access.sh for RAPL joules)"
-                           if profiles.get("meta", {}).get("power_source")
-                           != "rapl" else "RAPL-measured package power"),
-        "compile_time_s": total_compile_s,
-        "e_run_j": (power_w * 0.2 * runtime_for_edp) if runtime_for_edp else None,
-        "e_run_note": "runtime energy proxy (fraction of package power x runtime)",
-        "edp": edp,
-        "edp_baseline": edp_baseline,
-        "edp_savings_pct": savings,
+    energy: dict = {
+        "source": ("rapl" if "rapl" in (src_frontend, src_stage2, src_search,
+                                         src_passes, run_source)
+                   else result["power_source"]),
+        "measured": meter.available,
+        "n_runs": n_runs,
+        "e_compile_j": e_opt_compile,
+        "e_compile_baseline_j": e_base_compile,
+        "e_compile_note": ("RAPL package joules, idle-corrected"
+                           if meter.available else
+                           "P-hat x T (software estimate; run "
+                           "energy/setup_rapl_access.sh for RAPL joules)"),
+        "compile_time_s": t_opt_compile,
+        "compile_time_baseline_s": t_base_compile,
+        "stage_j": {"frontend": e_frontend, "stage2": e_stage2,
+                    "search": e_search, "passes": e_passes},
     }
+    if runtime_s and base_runtime_s:
+        base = Cost(e_base_compile, t_base_compile, e_run_base, base_runtime_s)
+        opt = Cost(e_opt_compile, t_opt_compile, e_run_opt, runtime_s)
+        life = summarize_lifecycle(base, opt)
+        energy.update({
+            "e_run_j": e_run_opt,
+            "e_run_baseline_j": e_run_base,
+            "e_run_note": ("RAPL package joules per native run"
+                           if run_source == "rapl" else
+                           "P-hat x T_run (software estimate)"),
+            "edp": opt.edp(n_runs),
+            "edp_baseline": base.edp(n_runs),
+            "edp_savings_pct": edp_savings_pct(base, opt, n_runs),
+            "break_even_runs": life["break_even_runs"],
+            "lifecycle": life["by_runs"],
+        })
+    else:
+        energy.update({"e_run_j": None, "edp": None, "edp_baseline": None,
+                       "edp_savings_pct": 0.0, "break_even_runs": None,
+                       "lifecycle": []})
+    result["energy"] = energy
     result["differential_note"] = (
         f"optimized main() returned {result['return_value']}, "
         f"matches unoptimized: {differential_ok}")
 
-    _log(logs, f"EDP: E_compile≈{e_compile_est * 1e3:.3f} mJ, "
-               f"T_run={runtime_for_edp * 1e6 if runtime_for_edp else 0:.0f} us, "
-               f"EDP={edp:.3e} ({savings:+.1f}% vs no-pass baseline)")
+    be = energy["break_even_runs"]
+    be_txt = ("n/a" if be is None else "0 (never costlier)" if be == 0
+              else f"{be:,.0f} runs")
+    _log(logs, f"EDP @ {n_runs:,} runs: E_compile={e_opt_compile * 1e3:.3f} mJ "
+               f"({energy['e_compile_note'].split(',')[0]}), "
+               f"T_run={(runtime_s or 0) * 1e6:.1f} us, "
+               f"savings {energy['edp_savings_pct']:+.1f}% vs no-pass baseline; "
+               f"break-even {be_txt}")
     _log(logs, "COMPILATION SUCCESSFUL" if (verified and differential_ok)
          else "COMPILATION FAILED VERIFICATION")
     result["success"] = bool(verified and differential_ok)
