@@ -179,8 +179,10 @@ def compile_source(
         holder: dict = {}
 
         def _search() -> None:
-            holder["ga"] = run_ga_search(
-                ir_text, **{"n_runs": n_runs, **(ga_kwargs or {})})
+            # -Mperf = maximum generated-code speed: the search assumes a
+            # hot program (PERF_RUNS executions) whatever run count the
+            # report below uses to charge the search cost back.
+            holder["ga"] = run_ga_search(ir_text, **(ga_kwargs or {}))
 
         t0 = time.perf_counter()
         # the search is stochastic and long: meter the one real execution

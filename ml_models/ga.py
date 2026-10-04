@@ -40,6 +40,7 @@ from stage2.pass_gating import load_profiles, DEFAULT_POWER_W
 _DEFAULT_RUN_TIME_PER_UNIT = 1e-6  # s of program runtime per static-cost unit
 INVALID_EDP = 1e30                 # fitness ~0: failed verification/semantics
 DEFAULT_RUNS = 10_000              # executions assumed for the lifecycle EDP
+PERF_RUNS = 10_000_000             # -Mperf optimizes for a hot, long-lived program
 
 
 @dataclass
@@ -96,7 +97,7 @@ class GeneticPassSearcher:
         seed: int = 42,
         power_w: float | None = None,
         profiles: dict | None = None,
-        n_runs: int = DEFAULT_RUNS,
+        n_runs: int = PERF_RUNS,
         runtime_model: str = "measured",
         finalists: int = 3,
     ):
