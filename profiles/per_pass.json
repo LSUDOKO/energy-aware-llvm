@@ -5,122 +5,122 @@
     "power_w": 25.0,
     "run_j_per_unit": 1e-06,
     "run_s_per_unit": 1e-06,
-    "updated": "2026-10-04T17:31:45"
+    "updated": "2026-10-04T18:24:56"
   },
   "passes": {
     "-adce": {
-      "energy_j": 0.001865674857981503,
-      "n_samples": 77,
+      "energy_j": 0.002877137558243703,
+      "n_samples": 112,
       "source": "collect_dataset",
-      "t_seconds": 7.462699431926012e-05
+      "t_seconds": 0.00011508550232974812
     },
     "-aggressive-instcombine": {
-      "energy_j": 0.008015949970285874,
-      "n_samples": 33,
+      "energy_j": 0.011515675032569561,
+      "n_samples": 48,
       "source": "collect_dataset",
-      "t_seconds": 0.00032063799881143495
+      "t_seconds": 0.00046062700130278245
     },
     "-constmerge": {
-      "energy_j": 0.0012485250408644788,
-      "n_samples": 33,
+      "energy_j": 0.002266725005029002,
+      "n_samples": 48,
       "source": "collect_dataset",
-      "t_seconds": 4.994100163457915e-05
+      "t_seconds": 9.066900020116009e-05
     },
     "-dce": {
-      "energy_j": 0.0014922250556992367,
-      "n_samples": 77,
+      "energy_j": 0.0023639499886485282,
+      "n_samples": 112,
       "source": "collect_dataset",
-      "t_seconds": 5.968900222796947e-05
+      "t_seconds": 9.455799954594113e-05
     },
     "-dse": {
-      "energy_j": 0.00913608746486716,
-      "n_samples": 88,
+      "energy_j": 0.013636274979944574,
+      "n_samples": 128,
       "source": "collect_dataset",
-      "t_seconds": 0.0003654434985946864
+      "t_seconds": 0.000545450999197783
     },
     "-globalopt": {
-      "energy_j": 0.0014856000234431121,
-      "n_samples": 22,
+      "energy_j": 0.002770987521216739,
+      "n_samples": 32,
       "source": "collect_dataset",
-      "t_seconds": 5.9424000937724486e-05
+      "t_seconds": 0.00011083950084866956
     },
     "-gvn": {
-      "energy_j": 0.013087850038573379,
-      "n_samples": 88,
+      "energy_j": 0.019483274991216604,
+      "n_samples": 112,
       "source": "collect_dataset",
-      "t_seconds": 0.0005235140015429351
+      "t_seconds": 0.0007793309996486641
     },
     "-instcombine": {
-      "energy_j": 0.013432599916995969,
-      "n_samples": 55,
+      "energy_j": 0.018893512515205657,
+      "n_samples": 80,
       "source": "collect_dataset",
-      "t_seconds": 0.0005373039966798387
+      "t_seconds": 0.0007557405006082263
     },
     "-ipsccp": {
-      "energy_j": 0.008465999962936621,
-      "n_samples": 33,
+      "energy_j": 0.013570250030170428,
+      "n_samples": 48,
       "source": "collect_dataset",
-      "t_seconds": 0.00033863999851746485
+      "t_seconds": 0.0005428100012068171
     },
     "-lcsr": {
-      "energy_j": 0.012940387478010962,
-      "n_samples": 66,
+      "energy_j": 0.017940587531484198,
+      "n_samples": 96,
       "source": "collect_dataset",
-      "t_seconds": 0.0005176154991204385
+      "t_seconds": 0.0007176235012593679
     },
     "-lcssa": {
-      "energy_j": 0.0017153999579022638,
-      "n_samples": 55,
+      "energy_j": 0.0029175374038459267,
+      "n_samples": 64,
       "source": "collect_dataset",
-      "t_seconds": 6.861599831609055e-05
+      "t_seconds": 0.00011670149615383707
     },
     "-loop-rotate": {
-      "energy_j": 0.011952862496400485,
-      "n_samples": 66,
+      "energy_j": 0.01735768755679601,
+      "n_samples": 96,
       "source": "collect_dataset",
-      "t_seconds": 0.0004781144998560194
+      "t_seconds": 0.0006943075022718403
     },
     "-loop-unroll": {
-      "energy_j": 0.01129020001826575,
-      "n_samples": 77,
+      "energy_j": 0.016466950000904035,
+      "n_samples": 96,
       "source": "collect_dataset",
-      "t_seconds": 0.00045160800073063
+      "t_seconds": 0.0006586780000361614
     },
     "-reassociate": {
-      "energy_j": 0.0023142500140238553,
-      "n_samples": 55,
+      "energy_j": 0.0033014374821505044,
+      "n_samples": 64,
       "source": "collect_dataset",
-      "t_seconds": 9.257000056095421e-05
+      "t_seconds": 0.00013205749928602017
     },
     "-sccp": {
-      "energy_j": 0.00935615007620072,
-      "n_samples": 99,
+      "energy_j": 0.012958237493876368,
+      "n_samples": 128,
       "source": "collect_dataset",
-      "t_seconds": 0.0003742460030480288
+      "t_seconds": 0.0005183294997550547
     },
     "-simplifycfg": {
-      "energy_j": 0.008976075059763389,
-      "n_samples": 154,
+      "energy_j": 0.012623537531908369,
+      "n_samples": 192,
       "source": "collect_dataset",
-      "t_seconds": 0.00035904300239053555
+      "t_seconds": 0.0005049415012763347
     },
     "-sinking": {
-      "energy_j": 0.007621724944328889,
-      "n_samples": 33,
+      "energy_j": 0.011492612429719884,
+      "n_samples": 48,
       "source": "collect_dataset",
-      "t_seconds": 0.00030486899777315557
+      "t_seconds": 0.00045970449718879536
     },
     "-sroa": {
-      "energy_j": 0.011254624951106962,
-      "n_samples": 99,
+      "energy_j": 0.014843012468190864,
+      "n_samples": 144,
       "source": "collect_dataset",
-      "t_seconds": 0.00045018499804427847
+      "t_seconds": 0.0005937204987276345
     },
     "-tailcallelim": {
-      "energy_j": 0.007532550080213696,
-      "n_samples": 33,
+      "energy_j": 0.010721112539613387,
+      "n_samples": 48,
       "source": "collect_dataset",
-      "t_seconds": 0.00030130200320854783
+      "t_seconds": 0.00042884450158453546
     }
   }
 }
