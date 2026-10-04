@@ -27,11 +27,6 @@ if [[ $EUID -ne 0 ]]; then
   exit 1
 fi
 
-# visudo -c validates syntax before we install; -f checks a candidate file.
-cat > "/tmp/rapl-sudoers-check" <<EOF
-$(whoami 2>/dev/null || true)
-EOF
-
 # The rule allows the invoking user (SUDO_USER, since we run under sudo) to
 # cat exactly the RAPL energy files, nothing else.
 REAL_USER="${SUDO_USER:?SUDO_USER not set - run this via sudo from your account}"
