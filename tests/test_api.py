@@ -59,3 +59,33 @@ def test_diagnostics_return_422(client):
                                       "mode": "-Meco"})
     assert r.status_code == 422
     assert "y" in r.get_json()["error"]
+
+
+def test_lists_all_bundled_benchmarks(client):
+    r = client.get("/benchmarks")
+    names = {b["name"] for b in r.get_json()}
+    assert r.status_code == 200
+    assert {"fib_rec", "mandelbrot", "const_fold"} <= names
+
+
+def test_benchmark_source_compiles(client):
+    body = client.get("/benchmarks/fib_iter").get_json()
+    assert body["expected_return"] == 832040
+    r = client.post("/compile", json={"source_code": body["source"],
+                                      "mode": "-Meco"})
+    assert r.get_json()["return_value"] == 832040
+
+
+def test_unknown_benchmark_is_404(client):
+    r = client.get("/benchmarks/nope")
+    assert r.status_code == 404 and "nope" in r.get_json()["error"]
+
+
+def test_benchmark_results_reflect_files(client, tmp_path, monkeypatch):
+    monkeypatch.setattr(api, "BENCH_REPORT_DIR", tmp_path)
+    assert client.get("/benchmark-results").status_code == 404
+    (tmp_path / "results.json").write_text('{"kernels": []}')
+    (tmp_path / "runtime_speedup.png").write_bytes(b"\x89PNG")
+    body = client.get("/benchmark-results").get_json()
+    assert body["available"] and body["charts"] == ["runtime_speedup.png"]
+    assert client.get("/reports/benchmarks/runtime_speedup.png").status_code == 200
